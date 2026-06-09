@@ -1,5 +1,5 @@
--- Goxie Script Menu (плавное меню + подсветка кнопок)
--- Нажми Right Shift для открытия меню
+-- Goxie Script Menu (ФИНАЛ: Исправлены кнопки ESP и настройка бинда)
+-- Нажмите настроенную клавишу для открытия меню (по умолчанию Right Shift)
 
 local player = game.Players.LocalPlayer
 local gui = Instance.new("ScreenGui")
@@ -10,16 +10,27 @@ local scrollContainer = Instance.new("ScrollingFrame")
 local scrollPadding = Instance.new("UIPadding")
 local scrollList = Instance.new("UIListLayout")
 
+-- --- Функции ---
 local btnFOV = Instance.new("TextButton")
 local statusFOV = Instance.new("TextLabel")
+local fovSlider = Instance.new("Frame")
+local fovSliderButton = Instance.new("TextButton")
+local fovValueLabel = Instance.new("TextLabel")
 local btnRes = Instance.new("TextButton")
 local statusRes = Instance.new("TextLabel")
 
+-- --- ESP ---
 local playerDropdown = Instance.new("TextBox")
 local btnESP = Instance.new("TextButton")
 local statusESP = Instance.new("TextLabel")
 local playersList = Instance.new("ScrollingFrame")
 local refreshBtn = Instance.new("TextButton")
+
+-- --- НАСТРОЙКА БИНДА ---
+local bindSection = Instance.new("Frame")
+local bindLabel = Instance.new("TextLabel")
+local bindButton = Instance.new("TextButton")
+local bindStatus = Instance.new("TextLabel")
 
 local fpsLabel = Instance.new("TextLabel")
 local notificationContainer = Instance.new("Frame")
@@ -31,57 +42,70 @@ gui.IgnoreGuiInset = true
 
 frame.Visible = false
 
--- === ПЛАВНОЕ ПОЯВЛЕНИЕ/ИСЧЕЗНОВЕНИЕ МЕНЮ ===
-local TweenService = game:GetService("TweenService")
-
-local function showMenu()
-    frame.Visible = true
-    frame.BackgroundTransparency = 0.3
-    local tween = TweenService:Create(frame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.25})
-    tween:Play()
-end
-
-local function hideMenu()
-    local tween = TweenService:Create(frame, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency = 0.3})
-    tween:Play()
-    wait(0.15)
-    frame.Visible = false
-end
-
 local UserInputService = game:GetService("UserInputService")
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.RightShift then
-        if frame.Visible then
-            hideMenu()
-        else
-            showMenu()
-        end
-    end
-end)
 
--- === ФУНКЦИЯ ДЛЯ ПОДСВЕТКИ КНОПОК ===
+-- === НАСТРОЙКА БИНДА (РАБОТАЕТ) ===
+local currentBind = Enum.KeyCode.RightShift
+local isWaitingForBind = false
+
+local function updateBindDisplay()
+    if bindButton then
+        bindButton.Text = currentBind.Name
+    end
+    if bindStatus then
+        bindStatus.Text = "Текущий бинд: " .. currentBind.Name .. " | Нажмите на кнопку, чтобы изменить"
+        bindStatus.TextColor3 = Color3.fromRGB(170, 190, 170)
+    end
+end
+
+local function setBind(keyCode)
+    currentBind = keyCode
+    updateBindDisplay()
+    showNotification("🔑 Бинд изменён на: " .. keyCode.Name, false)
+end
+
+local function onInputBegan(input, gameProcessed)
+    if gameProcessed then return end
+
+    if isWaitingForBind then
+        if input.KeyCode ~= Enum.KeyCode.Unknown then
+            setBind(input.KeyCode)
+            isWaitingForBind = false
+            if bindButton then bindButton.Text = currentBind.Name end
+            if bindStatus then
+                bindStatus.Text = "Готово! Новый бинд: " .. currentBind.Name
+                wait(1)
+                bindStatus.Text = "Нажмите на кнопку, чтобы изменить бинд"
+                bindStatus.TextColor3 = Color3.fromRGB(140, 140, 155)
+            end
+        end
+        return
+    end
+
+    if input.KeyCode == currentBind then
+        frame.Visible = not frame.Visible
+    end
+end
+
+UserInputService.InputBegan:Connect(onInputBegan)
+
+-- === ПОДСВЕТКА КНОПОК ===
 local function setupButtonHover(button)
-    local defaultBg = button.BackgroundTransparency
-    local defaultColor = button.BackgroundColor3
+    local originalColor = button.BackgroundColor3
+    local originalTrans = button.BackgroundTransparency
     
     button.MouseEnter:Connect(function()
-        local tween = TweenService:Create(button, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            BackgroundTransparency = 0.1,
-            BackgroundColor3 = Color3.fromRGB(45, 45, 65)
-        })
-        tween:Play()
+        button.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+        button.BackgroundTransparency = 0.15
     end)
     
     button.MouseLeave:Connect(function()
-        local tween = TweenService:Create(button, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            BackgroundTransparency = defaultBg,
-            BackgroundColor3 = defaultColor
-        })
-        tween:Play()
+        button.BackgroundColor3 = originalColor
+        button.BackgroundTransparency = originalTrans
     end)
 end
 
+-- --- УВЕДОМЛЕНИЯ ---
 notificationContainer.Size = UDim2.new(0, 300, 0, 200)
 notificationContainer.Position = UDim2.new(1, -310, 0, 10)
 notificationContainer.BackgroundTransparency = 1
@@ -108,42 +132,40 @@ local function showNotification(message, isError)
     text.Parent = notif
 
     notif.Position = UDim2.new(0, 5, 0, -50)
-    local tween = TweenService:Create(notif, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.new(0, 5, 0, 0)})
-    tween:Play()
-
-    local function shiftNotifications()
-        local y = 0
-        for _, child in ipairs(notificationContainer:GetChildren()) do
-            if child:IsA("Frame") and child ~= notif then
-                local targetY = y
-                local t = TweenService:Create(child, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.new(0, 5, 0, targetY)})
-                t:Play()
-                y = y + 45
-            end
-        end
-        notif.Position = UDim2.new(0, 5, 0, y)
+    for i = 1, 5 do
+        notif.Position = UDim2.new(0, 5, 0, notif.Position.Y.Offset + 10)
+        wait(0.02)
     end
-    shiftNotifications()
+
+    local y = 0
+    for _, child in ipairs(notificationContainer:GetChildren()) do
+        if child:IsA("Frame") and child ~= notif then
+            child.Position = UDim2.new(0, 5, 0, y)
+            y = y + 45
+        end
+    end
+    notif.Position = UDim2.new(0, 5, 0, y)
 
     game:GetService("Debris"):AddItem(notif, 3)
     wait(2.8)
-    local fadeOut = TweenService:Create(notif, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1})
-    fadeOut:Play()
-    fadeOut.Completed:Connect(function()
-        notif:Destroy()
-        local y = 0
-        for _, child in ipairs(notificationContainer:GetChildren()) do
-            if child:IsA("Frame") then
-                local t = TweenService:Create(child, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.new(0, 5, 0, y)})
-                t:Play()
-                y = y + 45
-            end
+    for i = 1, 5 do
+        notif.BackgroundTransparency = notif.BackgroundTransparency + 0.2
+        wait(0.02)
+    end
+    notif:Destroy()
+    
+    local y2 = 0
+    for _, child in ipairs(notificationContainer:GetChildren()) do
+        if child:IsA("Frame") then
+            child.Position = UDim2.new(0, 5, 0, y2)
+            y2 = y2 + 45
         end
-    end)
+    end
 end
 
-frame.Size = UDim2.new(0, 450, 0, 520)
-frame.Position = UDim2.new(0.5, -225, 0.5, -260)
+-- --- ОСНОВНОЕ ОКНО ---
+frame.Size = UDim2.new(0, 450, 0, 660) -- Высота увеличена
+frame.Position = UDim2.new(0.5, -225, 0.5, -330)
 frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 frame.BackgroundTransparency = 0.25
 frame.BorderSizePixel = 1
@@ -173,10 +195,11 @@ closeBtn.Font = Enum.Font.GothamBold
 closeBtn.TextSize = 18
 closeBtn.Parent = frame
 closeBtn.MouseButton1Click:Connect(function()
-    hideMenu()
+    frame.Visible = false
 end)
 setupButtonHover(closeBtn)
 
+-- --- СКРОЛЛ КОНТЕЙНЕР ---
 scrollContainer.Size = UDim2.new(1, -20, 1, -55)
 scrollContainer.Position = UDim2.new(0, 10, 0, 50)
 scrollContainer.BackgroundTransparency = 1
@@ -196,6 +219,7 @@ scrollList.SortOrder = Enum.SortOrder.LayoutOrder
 scrollList.Padding = UDim.new(0, 15)
 scrollList.Parent = scrollContainer
 
+-- --- FPS ---
 fpsLabel.Size = UDim2.new(0, 180, 0, 50)
 fpsLabel.Position = UDim2.new(0.5, -90, 0, 0)
 fpsLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -222,9 +246,9 @@ local function updateFPS()
         fpsLabel.Text = "FPS: " .. currentFPS
     end
 end
-
 fpsConnection = game:GetService("RunService").RenderStepped:Connect(updateFPS)
 
+-- --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 local function createSection(titleText, height)
     local section = Instance.new("Frame")
     section.Size = UDim2.new(1, 0, 0, height)
@@ -247,22 +271,54 @@ local function createSection(titleText, height)
     return section
 end
 
-local fovSection = createSection("FOV LOCK", 100)
-btnFOV.Size = UDim2.new(1, -20, 0, 40)
+-- === 1. FOV ===
+local fovSection = createSection("FOV LOCK", 160)
+btnFOV.Size = UDim2.new(1, -20, 0, 35)
 btnFOV.Position = UDim2.new(0, 10, 0, 35)
-btnFOV.Text = "ACTIVATE FOV LOCK (85)"
+btnFOV.Text = "ACTIVATE FOV LOCK"
 btnFOV.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 btnFOV.BackgroundTransparency = 0.3
 btnFOV.TextColor3 = Color3.fromRGB(200, 200, 210)
-btnFOV.TextSize = 14
+btnFOV.TextSize = 13
 btnFOV.Font = Enum.Font.Gotham
 btnFOV.BorderSizePixel = 1
 btnFOV.BorderColor3 = Color3.fromRGB(45, 45, 55)
 btnFOV.Parent = fovSection
 setupButtonHover(btnFOV)
 
+local sliderBg = Instance.new("Frame")
+sliderBg.Size = UDim2.new(0.7, 0, 0, 6)
+sliderBg.Position = UDim2.new(0.15, 0, 0, 80)
+sliderBg.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+sliderBg.BorderSizePixel = 0
+sliderBg.Parent = fovSection
+
+fovSlider.Size = UDim2.new(0, 10, 0, 10)
+fovSlider.BackgroundColor3 = Color3.fromRGB(200, 200, 210)
+fovSlider.BorderSizePixel = 0
+fovSlider.Parent = sliderBg
+
+fovSliderButton.Size = UDim2.new(0, 14, 0, 14)
+fovSliderButton.Position = UDim2.new(0.5, -7, 0, -4)
+fovSliderButton.BackgroundColor3 = Color3.fromRGB(150, 150, 170)
+fovSliderButton.BorderSizePixel = 1
+fovSliderButton.BorderColor3 = Color3.fromRGB(80, 80, 100)
+fovSliderButton.Text = ""
+fovSliderButton.Parent = fovSlider
+setupButtonHover(fovSliderButton)
+
+fovValueLabel.Size = UDim2.new(0.2, 0, 0, 20)
+fovValueLabel.Position = UDim2.new(0.87, 0, 0, 77)
+fovValueLabel.BackgroundTransparency = 1
+fovValueLabel.Text = "85"
+fovValueLabel.TextColor3 = Color3.fromRGB(200, 200, 210)
+fovValueLabel.TextSize = 12
+fovValueLabel.Font = Enum.Font.GothamBold
+fovValueLabel.TextXAlignment = Enum.TextXAlignment.Center
+fovValueLabel.Parent = fovSection
+
 statusFOV.Size = UDim2.new(1, -20, 0, 20)
-statusFOV.Position = UDim2.new(0, 10, 0, 80)
+statusFOV.Position = UDim2.new(0, 10, 0, 110)
 statusFOV.Text = "Status: OFF"
 statusFOV.TextColor3 = Color3.fromRGB(140, 140, 155)
 statusFOV.TextSize = 12
@@ -270,6 +326,40 @@ statusFOV.TextXAlignment = Enum.TextXAlignment.Left
 statusFOV.BackgroundTransparency = 1
 statusFOV.Parent = fovSection
 
+local currentFOVValue = 85
+local minFOV = 85
+local maxFOV = 140
+local isDragging = false
+
+local function updateSliderPosition(value)
+    local percent = (value - minFOV) / (maxFOV - minFOV)
+    local newX = percent * sliderBg.AbsoluteSize.X - (fovSlider.AbsoluteSize.X / 2)
+    fovSlider.Position = UDim2.new(0, math.clamp(newX, 0, sliderBg.AbsoluteSize.X - fovSlider.AbsoluteSize.X), 0, -2)
+    fovValueLabel.Text = tostring(math.floor(value))
+    currentFOVValue = math.floor(value)
+end
+
+fovSliderButton.MouseButton1Down:Connect(function()
+    isDragging = true
+    local mouse = player:GetMouse()
+    local connection = mouse.Move:Connect(function()
+        if isDragging then
+            local mouseX = mouse.X
+            local sliderAbsPos = sliderBg.AbsolutePosition.X
+            local sliderAbsSize = sliderBg.AbsoluteSize.X
+            local percent = (mouseX - sliderAbsPos) / sliderAbsSize
+            local newValue = minFOV + (maxFOV - minFOV) * math.clamp(percent, 0, 1)
+            updateSliderPosition(newValue)
+        end
+    end)
+    local releaseConnection = mouse.Button1Up:Connect(function()
+        isDragging = false
+        connection:Disconnect()
+        releaseConnection:Disconnect()
+    end)
+end)
+
+-- === 2. RESOLUTION ===
 local resSection = createSection("RESOLUTION MOD", 100)
 btnRes.Size = UDim2.new(1, -20, 0, 40)
 btnRes.Position = UDim2.new(0, 10, 0, 35)
@@ -277,7 +367,7 @@ btnRes.Text = "ACTIVATE RESOLUTION MOD (0.80)"
 btnRes.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 btnRes.BackgroundTransparency = 0.3
 btnRes.TextColor3 = Color3.fromRGB(200, 200, 210)
-btnRes.TextSize = 14
+btnRes.TextSize = 13
 btnRes.Font = Enum.Font.Gotham
 btnRes.BorderSizePixel = 1
 btnRes.BorderColor3 = Color3.fromRGB(45, 45, 55)
@@ -293,6 +383,7 @@ statusRes.TextXAlignment = Enum.TextXAlignment.Left
 statusRes.BackgroundTransparency = 1
 statusRes.Parent = resSection
 
+-- === 3. ESP ===
 local espSection = createSection("ESP - BLACK BOX + NAMETAGS", 230)
 
 playerDropdown.Size = UDim2.new(1, -20, 0, 35)
@@ -309,26 +400,29 @@ playerDropdown.BorderColor3 = Color3.fromRGB(45, 45, 55)
 playerDropdown.ClearTextOnFocus = false
 playerDropdown.Parent = espSection
 
-refreshBtn.Size = UDim2.new(0.48, 0, 0, 30)
+local buttonWidth = 0.48
+local buttonSpacing = 0.52
+
+refreshBtn.Size = UDim2.new(buttonWidth, 0, 0, 30)
 refreshBtn.Position = UDim2.new(0, 10, 0, 75)
 refreshBtn.Text = "Обновить список"
 refreshBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 refreshBtn.BackgroundTransparency = 0.3
 refreshBtn.TextColor3 = Color3.fromRGB(200, 200, 210)
-refreshBtn.TextSize = 12
+refreshBtn.TextSize = 11
 refreshBtn.Font = Enum.Font.Gotham
 refreshBtn.BorderSizePixel = 1
 refreshBtn.BorderColor3 = Color3.fromRGB(45, 45, 55)
 refreshBtn.Parent = espSection
 setupButtonHover(refreshBtn)
 
-btnESP.Size = UDim2.new(0.48, 0, 0, 30)
-btnESP.Position = UDim2.new(0.51, 0, 0, 75)
+btnESP.Size = UDim2.new(buttonWidth, 0, 0, 30) -- ТЕПЕРЬ ТОЧНО ТАКОЙ ЖЕ
+btnESP.Position = UDim2.new(buttonSpacing, 0, 0, 75)
 btnESP.Text = "ESP ON"
 btnESP.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 btnESP.BackgroundTransparency = 0.3
 btnESP.TextColor3 = Color3.fromRGB(200, 200, 210)
-btnESP.TextSize = 12
+btnESP.TextSize = 11
 btnESP.Font = Enum.Font.Gotham
 btnESP.BorderSizePixel = 1
 btnESP.BorderColor3 = Color3.fromRGB(45, 45, 55)
@@ -357,6 +451,70 @@ statusESP.TextXAlignment = Enum.TextXAlignment.Left
 statusESP.BackgroundTransparency = 1
 statusESP.Parent = espSection
 
+-- === 4. НАСТРОЙКА БИНДА (ДОБАВЛЕНА) ===
+bindSection.Size = UDim2.new(1, 0, 0, 80)
+bindSection.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+bindSection.BackgroundTransparency = 0.4
+bindSection.BorderSizePixel = 1
+bindSection.BorderColor3 = Color3.fromRGB(35, 35, 45)
+bindSection.Parent = scrollContainer
+
+local bindTitle = Instance.new("TextLabel")
+bindTitle.Size = UDim2.new(1, 0, 0, 30)
+bindTitle.BackgroundTransparency = 1
+bindTitle.Text = "НАСТРОЙКА БИНДА МЕНЮ"
+bindTitle.TextColor3 = Color3.fromRGB(180, 180, 195)
+bindTitle.TextSize = 15
+bindTitle.Font = Enum.Font.GothamBold
+bindTitle.TextXAlignment = Enum.TextXAlignment.Left
+bindTitle.Parent = bindSection
+
+bindLabel.Size = UDim2.new(0.5, 0, 0, 25)
+bindLabel.Position = UDim2.new(0, 10, 0, 35)
+bindLabel.BackgroundTransparency = 1
+bindLabel.Text = "Клавиша для открытия:"
+bindLabel.TextColor3 = Color3.fromRGB(160, 160, 175)
+bindLabel.TextSize = 12
+bindLabel.TextXAlignment = Enum.TextXAlignment.Left
+bindLabel.Parent = bindSection
+
+bindButton.Size = UDim2.new(0.2, 0, 0, 30)
+bindButton.Position = UDim2.new(0.6, 0, 0, 33)
+bindButton.Text = currentBind.Name
+bindButton.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+bindButton.BackgroundTransparency = 0.2
+bindButton.TextColor3 = Color3.fromRGB(220, 220, 230)
+bindButton.TextSize = 12
+bindButton.Font = Enum.Font.GothamBold
+bindButton.BorderSizePixel = 1
+bindButton.BorderColor3 = Color3.fromRGB(55, 55, 70)
+bindButton.Parent = bindSection
+setupButtonHover(bindButton)
+
+bindStatus.Size = UDim2.new(1, -20, 0, 20)
+bindStatus.Position = UDim2.new(0, 10, 0, 60)
+bindStatus.BackgroundTransparency = 1
+bindStatus.Text = "Нажмите на кнопку, чтобы изменить бинд"
+bindStatus.TextColor3 = Color3.fromRGB(140, 140, 155)
+bindStatus.TextSize = 11
+bindStatus.TextXAlignment = Enum.TextXAlignment.Left
+bindStatus.Parent = bindSection
+
+bindButton.MouseButton1Click:Connect(function()
+    if isWaitingForBind then
+        isWaitingForBind = false
+        bindButton.Text = currentBind.Name
+        bindStatus.Text = "Нажмите на кнопку, чтобы изменить бинд"
+        bindStatus.TextColor3 = Color3.fromRGB(140, 140, 155)
+    else
+        isWaitingForBind = true
+        bindButton.Text = "..."
+        bindStatus.Text = "Ожидание нажатия клавиши..."
+        bindStatus.TextColor3 = Color3.fromRGB(255, 200, 100)
+    end
+end)
+
+-- Обновление CanvasSize
 local function updateCanvasSize()
     local totalHeight = 0
     for _, child in ipairs(scrollContainer:GetChildren()) do
@@ -371,19 +529,23 @@ game:GetService("RunService").Heartbeat:Wait()
 updateCanvasSize()
 scrollContainer:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateCanvasSize)
 
+-- === ЛОГИКА FOV ===
 local fovActive = false
 local fovConnection = nil
 local camera = workspace.CurrentCamera
+local currentFOV = 85
 
-local function setFOV(enabled)
+local function setFOVLock(enabled)
     if enabled then
         if not fovConnection then
             fovConnection = camera:GetPropertyChangedSignal("FieldOfView"):Connect(function()
-                camera.FieldOfView = 85
+                if camera.FieldOfView ~= currentFOV then
+                    camera.FieldOfView = currentFOV
+                end
             end)
-            camera.FieldOfView = 85
+            camera.FieldOfView = currentFOV
         end
-        statusFOV.Text = "Status: ON (85 - LOCKED)"
+        statusFOV.Text = "Status: ON (" .. currentFOV .. " - LOCKED)"
         statusFOV.TextColor3 = Color3.fromRGB(170, 190, 170)
         btnFOV.Text = "DEACTIVATE FOV LOCK"
     else
@@ -394,15 +556,37 @@ local function setFOV(enabled)
         end
         statusFOV.Text = "Status: OFF"
         statusFOV.TextColor3 = Color3.fromRGB(140, 140, 155)
-        btnFOV.Text = "ACTIVATE FOV LOCK (85)"
+        btnFOV.Text = "ACTIVATE FOV LOCK"
     end
     fovActive = enabled
 end
 
 btnFOV.MouseButton1Click:Connect(function()
-    setFOV(not fovActive)
+    setFOVLock(not fovActive)
 end)
 
+local sliderConnection = nil
+fovSliderButton.MouseButton1Down:Connect(function()
+    sliderConnection = game:GetService("RunService").RenderStepped:Connect(function()
+        if isDragging and fovActive then
+            camera.FieldOfView = currentFOVValue
+            currentFOV = currentFOVValue
+        end
+    end)
+end)
+
+fovSliderButton.MouseButton1Up:Connect(function()
+    if sliderConnection then
+        sliderConnection:Disconnect()
+        sliderConnection = nil
+    end
+    if fovActive then
+        camera.FieldOfView = currentFOVValue
+        currentFOV = currentFOVValue
+    end
+end)
+
+-- === ЛОГИКА RESOLUTION ===
 local resActive = false
 local resConnection = nil
 local resolutionValue = 0.80
@@ -433,6 +617,7 @@ btnRes.MouseButton1Click:Connect(function()
     setResolution(not resActive)
 end)
 
+-- === ЛОГИКА ESP ===
 local espActive = false
 local targetPlayer = nil
 local espHighlight = nil
@@ -477,10 +662,7 @@ local function createHighlight(target, playerName)
         nameTags[target] = {tag}
     end
 
-    local characterAddedCon
-    local characterRemovingCon
-
-    local function onCharacterAdded(character)
+    local characterAddedCon = target.CharacterAdded:Connect(function(character)
         highlight.Parent = character
         if nameTags[target] then
             for _, tag in pairs(nameTags[target]) do
@@ -490,9 +672,9 @@ local function createHighlight(target, playerName)
         end
         local tag = createNametag(character, playerName)
         nameTags[target] = {tag}
-    end
-
-    local function onCharacterRemoving()
+    end)
+    
+    local characterRemovingCon = target.CharacterRemoving:Connect(function()
         highlight.Parent = nil
         if nameTags[target] then
             for _, tag in pairs(nameTags[target]) do
@@ -500,14 +682,11 @@ local function createHighlight(target, playerName)
             end
             nameTags[target] = nil
         end
-    end
+    end)
 
     if target.Character then
         highlight.Parent = target.Character
     end
-
-    characterAddedCon = target.CharacterAdded:Connect(onCharacterAdded)
-    characterRemovingCon = target.CharacterRemoving:Connect(onCharacterRemoving)
 
     table.insert(espConnections, characterAddedCon)
     table.insert(espConnections, characterRemovingCon)
@@ -656,5 +835,7 @@ btnESP.MouseButton1Click:Connect(function()
 end)
 
 updatePlayersList()
+updateSliderPosition(85)
+updateBindDisplay()
 
-print("Goxie Script Menu loaded | Press Right Shift to open/close | v1.2 - Smooth + Hover Effects")
+print("Goxie Script Menu loaded | Press " .. currentBind.Name .. " to open/close | v1.6 - FINAL")
