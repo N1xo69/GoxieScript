@@ -1,4 +1,4 @@
--- Goxie Script Menu (ФИНАЛ: поле ввода FOV + ТВОЙ ЗВУК при запуске)
+-- Goxie Script Menu (ФИНАЛ: 3-е лицо + множественный ESP)
 -- Нажмите настроенную клавишу для открытия меню (по умолчанию Right Shift)
 
 local player = game.Players.LocalPlayer
@@ -17,12 +17,18 @@ local fovInputBox = Instance.new("TextBox")
 local btnRes = Instance.new("TextButton")
 local statusRes = Instance.new("TextLabel")
 
--- --- ESP ---
+-- --- 3-е лицо ---
+local btnThirdPerson = Instance.new("TextButton")
+local statusThirdPerson = Instance.new("TextLabel")
+
+-- --- ESP (множественный) ---
 local playerDropdown = Instance.new("TextBox")
-local btnESP = Instance.new("TextButton")
-local statusESP = Instance.new("TextLabel")
+local btnAddESP = Instance.new("TextButton")
+local btnRemoveESP = Instance.new("TextButton")
 local playersList = Instance.new("ScrollingFrame")
 local refreshBtn = Instance.new("TextButton")
+local espPlayersList = Instance.new("ScrollingFrame")
+local statusESP = Instance.new("TextLabel")
 
 -- --- НАСТРОЙКА БИНДА ---
 local bindSection = Instance.new("Frame")
@@ -44,7 +50,7 @@ gui.Parent = game.CoreGui
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 
--- === ЗВУК ПРИ ЗАПУСКЕ (ТВОЙ ЗВУК) ===
+-- === ЗВУК ПРИ ЗАПУСКЕ ===
 local function playStartupSound()
     local sound = Instance.new("Sound")
     sound.SoundId = "rbxassetid://82845990304289"
@@ -84,10 +90,8 @@ loadingSubText.Font = Enum.Font.Gotham
 loadingSubText.TextXAlignment = Enum.TextXAlignment.Center
 loadingSubText.Parent = loadingFrame
 
--- Запускаем звук
 playStartupSound()
 
--- Анимация размытия
 for i = 0, 20 do
     blurEffect.Size = i
     wait(0.02)
@@ -106,6 +110,218 @@ blurEffect:Destroy()
 frame.Visible = false
 
 local UserInputService = game:GetService("UserInputService")
+local camera = workspace.CurrentCamera
+
+-- === 3-Е ЛИЦО (КОЛЁСИКО МЫШИ) ===
+local thirdPersonActive = false
+local currentCameraOffset = 10
+local minOffset = 3
+local maxOffset = 20
+
+local function setThirdPerson(enabled)
+    thirdPersonActive = enabled
+    if enabled then
+        statusThirdPerson.Text = "Status: ON (3 лицо)"
+        statusThirdPerson.TextColor3 = Color3.fromRGB(170, 190, 170)
+        btnThirdPerson.Text = "ВЫКЛЮЧИТЬ 3 ЛИЦО"
+        currentCameraOffset = 10
+    else
+        statusThirdPerson.Text = "Status: OFF (1 лицо)"
+        statusThirdPerson.TextColor3 = Color3.fromRGB(140, 140, 155)
+        btnThirdPerson.Text = "ВКЛЮЧИТЬ 3 ЛИЦО"
+        camera.CameraType = Enum.CameraType.Custom
+        camera.CameraSubject = player.Character
+    end
+end
+
+-- Обработка колёсика мыши
+local function onMouseWheel(input, gameProcessed)
+    if gameProcessed then return end
+    if not thirdPersonActive then return end
+    if input.KeyCode == Enum.KeyCode.ButtonWheelUp then
+        currentCameraOffset = math.min(currentCameraOffset + 1, maxOffset)
+    elseif input.KeyCode == Enum.KeyCode.ButtonWheelDown then
+        currentCameraOffset = math.max(currentCameraOffset - 1, minOffset)
+    end
+end
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.ButtonWheelUp or input.KeyCode == Enum.KeyCode.ButtonWheelDown then
+        onMouseWheel(input, gameProcessed)
+    end
+end)
+
+-- Обновление позиции камеры для 3-го лица
+game:GetService("RunService").RenderStepped:Connect(function()
+    if thirdPersonActive and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        local rootPart = player.Character.HumanoidRootPart
+        local direction = camera.CFrame.LookVector
+        local newPos = rootPart.Position - direction * currentCameraOffset + Vector3.new(0, 2, 0)
+        camera.CFrame = CFrame.new(newPos, rootPart.Position)
+        camera.CameraType = Enum.CameraType.Scriptable
+    elseif thirdPersonActive and not player.Character then
+        setThirdPerson(false)
+    end
+end)
+
+-- === МНОЖЕСТВЕННЫЙ ESP ===
+local espPlayers = {}  -- таблица с игроками, на которых включен ESP
+local espHighlights = {}  -- таблица с Highlight для каждого игрока
+local nameTags = {}  -- таблица с никнеймами
+
+local function createNametag(character, playerName)
+    local billboard = Instance.new("BillboardGui")
+    billboard.Size = UDim2.new(0, 250, 0, 40)
+    billboard.Adornee = character:FindFirstChild("Head") or character
+    billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = character
+
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    textLabel.Text = playerName
+    textLabel.TextSize = 18
+    textLabel.Font = Enum.Font.GothamBold
+    textLabel.TextStrokeTransparency = 0.3
+    textLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    textLabel.Parent = billboard
+
+    return billboard
+end
+
+local function addESP(targetPlayer)
+    if not targetPlayer or targetPlayer == player then return false end
+    if espPlayers[targetPlayer] then return false end
+    
+    local highlight = Instance.new("Highlight")
+    highlight.FillColor = Color3.fromRGB(0, 0, 0)
+    highlight.OutlineColor = Color3.fromRGB(0, 0, 0)
+    highlight.FillTransparency = 0.5
+    highlight.OutlineTransparency = 0
+    
+    local function updateHighlight()
+        highlight.Parent = targetPlayer.Character
+    end
+    
+    if targetPlayer.Character then
+        highlight.Parent = targetPlayer.Character
+        local tag = createNametag(targetPlayer.Character, targetPlayer.Name)
+        nameTags[targetPlayer] = tag
+    end
+    
+    local characterAddedCon = targetPlayer.CharacterAdded:Connect(function(character)
+        highlight.Parent = character
+        if nameTags[targetPlayer] then nameTags[targetPlayer]:Destroy() end
+        nameTags[targetPlayer] = createNametag(character, targetPlayer.Name)
+    end)
+    
+    local characterRemovingCon = targetPlayer.CharacterRemoving:Connect(function()
+        highlight.Parent = nil
+        if nameTags[targetPlayer] then nameTags[targetPlayer]:Destroy() end
+        nameTags[targetPlayer] = nil
+    end)
+    
+    espPlayers[targetPlayer] = {
+        highlight = highlight,
+        addedCon = characterAddedCon,
+        removingCon = characterRemovingCon
+    }
+    
+    updateESPListDisplay()
+    return true
+end
+
+local function removeESP(targetPlayer)
+    if not espPlayers[targetPlayer] then return false end
+    
+    local data = espPlayers[targetPlayer]
+    data.highlight:Destroy()
+    data.addedCon:Disconnect()
+    data.removingCon:Disconnect()
+    if nameTags[targetPlayer] then nameTags[targetPlayer]:Destroy() end
+    nameTags[targetPlayer] = nil
+    espPlayers[targetPlayer] = nil
+    
+    updateESPListDisplay()
+    return true
+end
+
+local function removeAllESP()
+    for plr, _ in pairs(espPlayers) do
+        removeESP(plr)
+    end
+end
+
+-- Обновление отображения списка ESP игроков
+local function updateESPListDisplay()
+    for _, child in ipairs(espPlayersList:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+    
+    local y = 0
+    for plr, _ in pairs(espPlayers) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, -10, 0, 25)
+        btn.Position = UDim2.new(0, 5, 0, y)
+        btn.Text = plr.Name .. " ✖"
+        btn.BackgroundColor3 = Color3.fromRGB(30, 20, 20)
+        btn.BackgroundTransparency = 0.3
+        btn.TextColor3 = Color3.fromRGB(255, 150, 150)
+        btn.TextSize = 12
+        btn.Font = Enum.Font.Gotham
+        btn.BorderSizePixel = 1
+        btn.BorderColor3 = Color3.fromRGB(55, 55, 70)
+        btn.Parent = espPlayersList
+        setupButtonHover(btn)
+        
+        btn.MouseButton1Click:Connect(function()
+            removeESP(plr)
+            showNotification("❌ ESP выключен для " .. plr.Name, false)
+        end)
+        y = y + 30
+    end
+    espPlayersList.CanvasSize = UDim2.new(0, 0, 0, y + 10)
+end
+
+-- Обновление списка доступных игроков
+local function updatePlayersList()
+    for _, child in ipairs(playersList:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+    
+    local players = game.Players:GetPlayers()
+    local y = 0
+    for _, plr in ipairs(players) do
+        if plr ~= player then
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, -10, 0, 25)
+            btn.Position = UDim2.new(0, 5, 0, y)
+            btn.Text = plr.Name
+            btn.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+            btn.BackgroundTransparency = 0.3
+            btn.TextColor3 = Color3.fromRGB(200, 200, 210)
+            btn.TextSize = 12
+            btn.Font = Enum.Font.Gotham
+            btn.BorderSizePixel = 1
+            btn.BorderColor3 = Color3.fromRGB(45, 45, 55)
+            btn.Parent = playersList
+            setupButtonHover(btn)
+            
+            btn.MouseButton1Click:Connect(function()
+                playerDropdown.Text = plr.Name
+            end)
+            y = y + 30
+        end
+    end
+    playersList.CanvasSize = UDim2.new(0, 0, 0, y + 10)
+end
 
 -- === НАСТРОЙКА БИНДА ===
 local currentBind = Enum.KeyCode.RightShift
@@ -225,8 +441,8 @@ local function showNotification(message, isError)
 end
 
 -- --- ОСНОВНОЕ ОКНО ---
-frame.Size = UDim2.new(0, 450, 0, 650)
-frame.Position = UDim2.new(0.5, -225, 0.5, -325)
+frame.Size = UDim2.new(0, 550, 0, 700)
+frame.Position = UDim2.new(0.5, -275, 0.5, -350)
 frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 frame.BackgroundTransparency = 0.25
 frame.BorderSizePixel = 1
@@ -332,9 +548,8 @@ local function createSection(titleText, height)
     return section
 end
 
--- === 1. FOV (с полем ввода) ===
+-- === 1. FOV ===
 local fovSection = createSection("FOV LOCK", 140)
-
 btnFOV.Size = UDim2.new(1, -20, 0, 35)
 btnFOV.Position = UDim2.new(0, 10, 0, 35)
 btnFOV.Text = "ACTIVATE FOV LOCK"
@@ -348,7 +563,6 @@ btnFOV.BorderColor3 = Color3.fromRGB(45, 45, 55)
 btnFOV.Parent = fovSection
 setupButtonHover(btnFOV)
 
--- Поле ввода значения FOV
 local fovInputLabel = Instance.new("TextLabel")
 fovInputLabel.Size = UDim2.new(0.4, 0, 0, 25)
 fovInputLabel.Position = UDim2.new(0, 10, 0, 80)
@@ -407,8 +621,36 @@ statusRes.TextXAlignment = Enum.TextXAlignment.Left
 statusRes.BackgroundTransparency = 1
 statusRes.Parent = resSection
 
--- === 3. ESP ===
-local espSection = createSection("ESP - BLACK BOX + NAMETAGS", 230)
+-- === 3. 3-Е ЛИЦО ===
+local thirdPersonSection = createSection("ТРЕТЬЕ ЛИЦО", 100)
+btnThirdPerson.Size = UDim2.new(1, -20, 0, 40)
+btnThirdPerson.Position = UDim2.new(0, 10, 0, 35)
+btnThirdPerson.Text = "ВКЛЮЧИТЬ 3 ЛИЦО"
+btnThirdPerson.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+btnThirdPerson.BackgroundTransparency = 0.3
+btnThirdPerson.TextColor3 = Color3.fromRGB(200, 200, 210)
+btnThirdPerson.TextSize = 13
+btnThirdPerson.Font = Enum.Font.Gotham
+btnThirdPerson.BorderSizePixel = 1
+btnThirdPerson.BorderColor3 = Color3.fromRGB(45, 45, 55)
+btnThirdPerson.Parent = thirdPersonSection
+setupButtonHover(btnThirdPerson)
+
+statusThirdPerson.Size = UDim2.new(1, -20, 0, 20)
+statusThirdPerson.Position = UDim2.new(0, 10, 0, 80)
+statusThirdPerson.Text = "Status: OFF (1 лицо)"
+statusThirdPerson.TextColor3 = Color3.fromRGB(140, 140, 155)
+statusThirdPerson.TextSize = 12
+statusThirdPerson.TextXAlignment = Enum.TextXAlignment.Left
+statusThirdPerson.BackgroundTransparency = 1
+statusThirdPerson.Parent = thirdPersonSection
+
+btnThirdPerson.MouseButton1Click:Connect(function()
+    setThirdPerson(not thirdPersonActive)
+end)
+
+-- === 4. ESP (множественный) ===
+local espSection = createSection("ESP - МНОЖЕСТВЕННЫЙ", 350)
 
 playerDropdown.Size = UDim2.new(1, -20, 0, 35)
 playerDropdown.Position = UDim2.new(0, 10, 0, 35)
@@ -424,8 +666,8 @@ playerDropdown.BorderColor3 = Color3.fromRGB(45, 45, 55)
 playerDropdown.ClearTextOnFocus = false
 playerDropdown.Parent = espSection
 
-local buttonWidth = 0.44
-local buttonHeight = 28
+local buttonWidth = 0.32
+local buttonHeight = 30
 
 refreshBtn.Size = UDim2.new(buttonWidth, 0, 0, buttonHeight)
 refreshBtn.Position = UDim2.new(0, 10, 0, 78)
@@ -440,21 +682,45 @@ refreshBtn.BorderColor3 = Color3.fromRGB(45, 45, 55)
 refreshBtn.Parent = espSection
 setupButtonHover(refreshBtn)
 
-btnESP.Size = UDim2.new(buttonWidth, 0, 0, buttonHeight)
-btnESP.Position = UDim2.new(0.54, 0, 0, 78)
-btnESP.Text = "ESP ON"
-btnESP.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-btnESP.BackgroundTransparency = 0.3
-btnESP.TextColor3 = Color3.fromRGB(200, 200, 210)
-btnESP.TextSize = 11
-btnESP.Font = Enum.Font.Gotham
-btnESP.BorderSizePixel = 1
-btnESP.BorderColor3 = Color3.fromRGB(45, 45, 55)
-btnESP.Parent = espSection
-setupButtonHover(btnESP)
+btnAddESP.Size = UDim2.new(buttonWidth, 0, 0, buttonHeight)
+btnAddESP.Position = UDim2.new(0.34, 0, 0, 78)
+btnAddESP.Text = "➕ ДОБАВИТЬ"
+btnAddESP.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+btnAddESP.BackgroundTransparency = 0.3
+btnAddESP.TextColor3 = Color3.fromRGB(200, 200, 210)
+btnAddESP.TextSize = 11
+btnAddESP.Font = Enum.Font.Gotham
+btnAddESP.BorderSizePixel = 1
+btnAddESP.BorderColor3 = Color3.fromRGB(45, 45, 55)
+btnAddESP.Parent = espSection
+setupButtonHover(btnAddESP)
 
-playersList.Size = UDim2.new(1, -20, 0, 70)
-playersList.Position = UDim2.new(0, 10, 0, 115)
+btnRemoveESP.Size = UDim2.new(buttonWidth, 0, 0, buttonHeight)
+btnRemoveESP.Position = UDim2.new(0.68, 0, 0, 78)
+btnRemoveESP.Text = "❌ УДАЛИТЬ ВСЕХ"
+btnRemoveESP.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+btnRemoveESP.BackgroundTransparency = 0.3
+btnRemoveESP.TextColor3 = Color3.fromRGB(200, 200, 210)
+btnRemoveESP.TextSize = 11
+btnRemoveESP.Font = Enum.Font.Gotham
+btnRemoveESP.BorderSizePixel = 1
+btnRemoveESP.BorderColor3 = Color3.fromRGB(45, 45, 55)
+btnRemoveESP.Parent = espSection
+setupButtonHover(btnRemoveESP)
+
+-- Список доступных игроков
+local playersLabel = Instance.new("TextLabel")
+playersLabel.Size = UDim2.new(1, -20, 0, 20)
+playersLabel.Position = UDim2.new(0, 10, 0, 115)
+playersLabel.BackgroundTransparency = 1
+playersLabel.Text = "Доступные игроки:"
+playersLabel.TextColor3 = Color3.fromRGB(160, 160, 175)
+playersLabel.TextSize = 12
+playersLabel.TextXAlignment = Enum.TextXAlignment.Left
+playersLabel.Parent = espSection
+
+playersList.Size = UDim2.new(0.48, 0, 0, 100)
+playersList.Position = UDim2.new(0, 10, 0, 135)
 playersList.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
 playersList.BackgroundTransparency = 0.2
 playersList.BorderSizePixel = 1
@@ -462,20 +728,72 @@ playersList.BorderColor3 = Color3.fromRGB(45, 45, 55)
 playersList.ScrollBarThickness = 6
 playersList.Parent = espSection
 
+-- Список ESP игроков
+local espPlayersLabel = Instance.new("TextLabel")
+espPlayersLabel.Size = UDim2.new(1, -20, 0, 20)
+espPlayersLabel.Position = UDim2.new(0, 250, 0, 115)
+espPlayersLabel.BackgroundTransparency = 1
+espPlayersLabel.Text = "ESP активен для:"
+espPlayersLabel.TextColor3 = Color3.fromRGB(160, 160, 175)
+espPlayersLabel.TextSize = 12
+espPlayersLabel.TextXAlignment = Enum.TextXAlignment.Left
+espPlayersLabel.Parent = espSection
+
+espPlayersList.Size = UDim2.new(0.48, 0, 0, 100)
+espPlayersList.Position = UDim2.new(0.51, 0, 0, 135)
+espPlayersList.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+espPlayersList.BackgroundTransparency = 0.2
+espPlayersList.BorderSizePixel = 1
+espPlayersList.BorderColor3 = Color3.fromRGB(45, 45, 55)
+espPlayersList.ScrollBarThickness = 6
+espPlayersList.Parent = espSection
+
 local playersListLayout = Instance.new("UIListLayout")
 playersListLayout.Padding = UDim.new(0, 5)
 playersListLayout.Parent = playersList
 
 statusESP.Size = UDim2.new(1, -20, 0, 25)
-statusESP.Position = UDim2.new(0, 10, 0, 195)
-statusESP.Text = "ESP Status: OFF"
+statusESP.Position = UDim2.new(0, 10, 0, 250)
+statusESP.Text = "ESP Status: Нет активных"
 statusESP.TextColor3 = Color3.fromRGB(140, 140, 155)
 statusESP.TextSize = 12
 statusESP.TextXAlignment = Enum.TextXAlignment.Left
 statusESP.BackgroundTransparency = 1
 statusESP.Parent = espSection
 
--- === 4. НАСТРОЙКА БИНДА ===
+-- Обработчики ESP
+refreshBtn.MouseButton1Click:Connect(function()
+    updatePlayersList()
+    showNotification("📋 Список игроков обновлён", false)
+end)
+
+btnAddESP.MouseButton1Click:Connect(function()
+    local name = playerDropdown.Text
+    if name == nil or name == "" then
+        showNotification("❌ Введите имя игрока", true)
+        return
+    end
+    local target = game.Players:FindFirstChild(name)
+    if not target then
+        showNotification("❌ Игрок не найден", true)
+        return
+    end
+    if addESP(target) then
+        showNotification("✅ ESP добавлен для " .. target.Name, false)
+        statusESP.Text = "ESP Status: Активно (" .. table.concat(espPlayers, ", ") .. ")"
+    else
+        showNotification("❌ Уже в ESP или нельзя добавить себя", true)
+    end
+    playerDropdown.Text = ""
+end)
+
+btnRemoveESP.MouseButton1Click:Connect(function()
+    removeAllESP()
+    showNotification("🗑️ Весь ESP отключён", false)
+    statusESP.Text = "ESP Status: Нет активных"
+end)
+
+-- === 5. НАСТРОЙКА БИНДА ===
 bindSection.Size = UDim2.new(1, 0, 0, 80)
 bindSection.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 bindSection.BackgroundTransparency = 0.4
@@ -556,10 +874,8 @@ scrollContainer:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateCanvasSiz
 -- === ЛОГИКА FOV ===
 local fovActive = false
 local fovConnection = nil
-local camera = workspace.CurrentCamera
 local currentFOV = 85
 
--- Обработчик ввода FOV
 fovInputBox.FocusLost:Connect(function(enterPressed)
     if enterPressed then
         local newValue = tonumber(fovInputBox.Text)
@@ -637,224 +953,16 @@ btnRes.MouseButton1Click:Connect(function()
     setResolution(not resActive)
 end)
 
--- === ЛОГИКА ESP ===
-local espActive = false
-local targetPlayer = nil
-local espHighlight = nil
-local nameTags = {}
-local espConnections = {}
-local playerLeaveConnection = nil
-
-local function createNametag(character, playerName)
-    local billboard = Instance.new("BillboardGui")
-    billboard.Size = UDim2.new(0, 250, 0, 40)
-    billboard.Adornee = character:FindFirstChild("Head") or character
-    billboard.StudsOffset = Vector3.new(0, 2.5, 0)
-    billboard.AlwaysOnTop = true
-    billboard.Parent = character
-
-    local textLabel = Instance.new("TextLabel")
-    textLabel.Size = UDim2.new(1, 0, 1, 0)
-    textLabel.BackgroundTransparency = 1
-    textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    textLabel.Text = playerName
-    textLabel.TextSize = 18
-    textLabel.Font = Enum.Font.GothamBold
-    textLabel.TextStrokeTransparency = 0.3
-    textLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    textLabel.Parent = billboard
-
-    return billboard
-end
-
-local function createHighlight(target, playerName)
-    if espHighlight then espHighlight:Destroy() end
-
-    local highlight = Instance.new("Highlight")
-    highlight.FillColor = Color3.fromRGB(0, 0, 0)
-    highlight.OutlineColor = Color3.fromRGB(0, 0, 0)
-    highlight.FillTransparency = 0.5
-    highlight.OutlineTransparency = 0
-    highlight.Parent = target.Character or target
-
-    if target.Character then
-        local tag = createNametag(target.Character, playerName)
-        nameTags[target] = {tag}
-    end
-
-    local characterAddedCon = target.CharacterAdded:Connect(function(character)
-        highlight.Parent = character
-        if nameTags[target] then
-            for _, tag in pairs(nameTags[target]) do
-                if tag then tag:Destroy() end
-            end
-            nameTags[target] = nil
-        end
-        local tag = createNametag(character, playerName)
-        nameTags[target] = {tag}
-    end)
-    
-    local characterRemovingCon = target.CharacterRemoving:Connect(function()
-        highlight.Parent = nil
-        if nameTags[target] then
-            for _, tag in pairs(nameTags[target]) do
-                if tag then tag:Destroy() end
-            end
-            nameTags[target] = nil
-        end
-    end)
-
-    if target.Character then
-        highlight.Parent = target.Character
-    end
-
-    table.insert(espConnections, characterAddedCon)
-    table.insert(espConnections, characterRemovingCon)
-
-    return highlight
-end
-
-local function updatePlayersList()
-    for _, child in ipairs(playersList:GetChildren()) do
-        if child:IsA("TextButton") then
-            child:Destroy()
-        end
-    end
-
-    local players = game.Players:GetPlayers()
-    for _, plr in ipairs(players) do
-        if plr ~= player then
-            local btn = Instance.new("TextButton")
-            btn.Size = UDim2.new(1, -10, 0, 25)
-            btn.Text = plr.Name
-            btn.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-            btn.BackgroundTransparency = 0.3
-            btn.TextColor3 = Color3.fromRGB(200, 200, 210)
-            btn.TextSize = 12
-            btn.Font = Enum.Font.Gotham
-            btn.BorderSizePixel = 1
-            btn.BorderColor3 = Color3.fromRGB(45, 45, 55)
-            btn.Parent = playersList
-            setupButtonHover(btn)
-
-            btn.MouseButton1Click:Connect(function()
-                playerDropdown.Text = plr.Name
-            end)
-        end
-    end
-
-    playersList.CanvasSize = UDim2.new(0, 0, 0, playersListLayout.AbsoluteContentSize.Y)
-end
-
-refreshBtn.MouseButton1Click:Connect(function()
-    updatePlayersList()
-    statusESP.Text = "ESP Status: Список обновлен"
-    statusESP.TextColor3 = Color3.fromRGB(170, 190, 170)
-    wait(1)
-    if not espActive then
-        statusESP.Text = "ESP Status: OFF"
-        statusESP.TextColor3 = Color3.fromRGB(140, 140, 155)
-    end
-end)
-
-local function setupLeaveTracker(target)
-    if playerLeaveConnection then
-        playerLeaveConnection:Disconnect()
-    end
-
-    playerLeaveConnection = game.Players.PlayerRemoving:Connect(function(leavingPlayer)
-        if leavingPlayer == targetPlayer then
-            showNotification("🔴 " .. targetPlayer.Name .. " вышел из игры", true)
-            setESP(false)
-        end
-    end)
-end
-
-function setESP(enabled)
-    if enabled then
-        local name = playerDropdown.Text
-        if name == nil or name == "" then
-            statusESP.Text = "ESP Status: Ошибка - введите имя игрока"
-            statusESP.TextColor3 = Color3.fromRGB(200, 120, 120)
-            showNotification("Ошибка: введите имя игрока", true)
-            return false
-        end
-
-        targetPlayer = game.Players:FindFirstChild(name)
-        if not targetPlayer then
-            statusESP.Text = "ESP Status: Игрок не найден"
-            statusESP.TextColor3 = Color3.fromRGB(200, 120, 120)
-            showNotification("❌ Игрок \"" .. name .. "\" не найден", true)
-            return false
-        end
-
-        if targetPlayer == player then
-            statusESP.Text = "ESP Status: Нельзя подсвечивать себя"
-            statusESP.TextColor3 = Color3.fromRGB(200, 120, 120)
-            showNotification("❌ Нельзя подсвечивать себя", true)
-            return false
-        end
-
-        espHighlight = createHighlight(targetPlayer, targetPlayer.Name)
-        espActive = true
-        statusESP.Text = "ESP Status: ON - " .. targetPlayer.Name
-        statusESP.TextColor3 = Color3.fromRGB(170, 190, 170)
-        btnESP.Text = "ESP OFF"
-        showNotification("✅ ESP включен для " .. targetPlayer.Name, false)
-
-        setupLeaveTracker(targetPlayer)
-
-        return true
-    else
-        if espHighlight then espHighlight:Destroy() end
-        espHighlight = nil
-
-        local oldTargetName = targetPlayer and targetPlayer.Name or "игрока"
-
-        if nameTags then
-            for _, tags in pairs(nameTags) do
-                if tags then
-                    for _, tag in pairs(tags) do
-                        if tag then tag:Destroy() end
-                    end
-                end
-            end
-            nameTags = {}
-        end
-
-        targetPlayer = nil
-        espActive = false
-        for _, con in pairs(espConnections) do
-            if con then con:Disconnect() end
-        end
-        espConnections = {}
-
-        if playerLeaveConnection then
-            playerLeaveConnection:Disconnect()
-            playerLeaveConnection = nil
-        end
-
-        statusESP.Text = "ESP Status: OFF"
-        statusESP.TextColor3 = Color3.fromRGB(140, 140, 155)
-        btnESP.Text = "ESP ON"
-
-        if oldTargetName ~= "игрока" and oldTargetName then
-            showNotification("⛔ ESP выключен для " .. oldTargetName, false)
-        end
-
-        return true
-    end
-end
-
-btnESP.MouseButton1Click:Connect(function()
-    if espActive then
-        setESP(false)
-    else
-        setESP(true)
+-- Обработка выхода игроков
+game.Players.PlayerRemoving:Connect(function(leavingPlayer)
+    if espPlayers[leavingPlayer] then
+        removeESP(leavingPlayer)
+        showNotification("🔴 " .. leavingPlayer.Name .. " вышел из игры, ESP отключён", true)
     end
 end)
 
 updatePlayersList()
 updateBindDisplay()
+updateESPListDisplay()
 
-print("Goxie Script Menu loaded | Press " .. currentBind.Name .. " to open/close | v2.1 - Твой звук + FOV input")
+print("Goxie Script Menu loaded | Press " .. currentBind.Name .. " to open/close | v3.0 - 3rd Person + Multiple ESP")
