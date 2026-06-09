@@ -1,4 +1,4 @@
--- Goxie Script Menu (ФИНАЛ: 3-е лицо + множественный ESP)
+-- Goxie Script Menu (ФИНАЛ: Skybox Changer + 3-е лицо + множественный ESP)
 -- Нажмите настроенную клавишу для открытия меню (по умолчанию Right Shift)
 
 local player = game.Players.LocalPlayer
@@ -20,6 +20,12 @@ local statusRes = Instance.new("TextLabel")
 -- --- 3-е лицо ---
 local btnThirdPerson = Instance.new("TextButton")
 local statusThirdPerson = Instance.new("TextLabel")
+
+-- --- Skybox ---
+local skyboxInputBox = Instance.new("TextBox")
+local btnSkybox = Instance.new("TextButton")
+local btnResetSkybox = Instance.new("TextButton")
+local statusSkybox = Instance.new("TextLabel")
 
 -- --- ESP (множественный) ---
 local playerDropdown = Instance.new("TextBox")
@@ -112,7 +118,7 @@ frame.Visible = false
 local UserInputService = game:GetService("UserInputService")
 local camera = workspace.CurrentCamera
 
--- === 3-Е ЛИЦО (КОЛЁСИКО МЫШИ) ===
+-- === 3-Е ЛИЦО ===
 local thirdPersonActive = false
 local currentCameraOffset = 10
 local minOffset = 3
@@ -130,12 +136,10 @@ local function setThirdPerson(enabled)
         statusThirdPerson.TextColor3 = Color3.fromRGB(140, 140, 155)
         btnThirdPerson.Text = "ВКЛЮЧИТЬ 3 ЛИЦО"
         camera.CameraType = Enum.CameraType.Custom
-        camera.CameraSubject = player.Character
     end
 end
 
--- Обработка колёсика мыши
-local function onMouseWheel(input, gameProcessed)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if not thirdPersonActive then return end
     if input.KeyCode == Enum.KeyCode.ButtonWheelUp then
@@ -143,16 +147,8 @@ local function onMouseWheel(input, gameProcessed)
     elseif input.KeyCode == Enum.KeyCode.ButtonWheelDown then
         currentCameraOffset = math.max(currentCameraOffset - 1, minOffset)
     end
-end
-
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.ButtonWheelUp or input.KeyCode == Enum.KeyCode.ButtonWheelDown then
-        onMouseWheel(input, gameProcessed)
-    end
 end)
 
--- Обновление позиции камеры для 3-го лица
 game:GetService("RunService").RenderStepped:Connect(function()
     if thirdPersonActive and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
         local rootPart = player.Character.HumanoidRootPart
@@ -165,10 +161,100 @@ game:GetService("RunService").RenderStepped:Connect(function()
     end
 end)
 
+-- === SKYBOX ===
+local originalSkybox = nil
+local skyboxChanged = false
+
+local function saveOriginalSkybox()
+    local sky = lighting:FindFirstChildWhichIsA("Sky")
+    if not sky then
+        sky = Instance.new("Sky")
+        sky.Parent = lighting
+    end
+    originalSkybox = {
+        SkyboxBk = sky.SkyboxBk,
+        SkyboxDn = sky.SkyboxDn,
+        SkyboxFt = sky.SkyboxFt,
+        SkyboxLf = sky.SkyboxLf,
+        SkyboxRt = sky.SkyboxRt,
+        SkyboxUp = sky.SkyboxUp
+    }
+end
+
+local function applySkybox(id)
+    if not id or id == "" then
+        statusSkybox.Text = "Ошибка: введите ID"
+        statusSkybox.TextColor3 = Color3.fromRGB(200, 120, 120)
+        return false
+    end
+    
+    local assetId = tonumber(id)
+    if not assetId then
+        statusSkybox.Text = "Ошибка: ID должно быть числом"
+        statusSkybox.TextColor3 = Color3.fromRGB(200, 120, 120)
+        return false
+    end
+    
+    if not originalSkybox then
+        saveOriginalSkybox()
+    end
+    
+    local sky = lighting:FindFirstChildWhichIsA("Sky")
+    if not sky then
+        sky = Instance.new("Sky")
+        sky.Parent = lighting
+    end
+    
+    local assetUrl = "rbxassetid://" .. assetId
+    
+    local success, err = pcall(function()
+        sky.SkyboxBk = assetUrl
+        sky.SkyboxDn = assetUrl
+        sky.SkyboxFt = assetUrl
+        sky.SkyboxLf = assetUrl
+        sky.SkyboxRt = assetUrl
+        sky.SkyboxUp = assetUrl
+    end)
+    
+    if success then
+        skyboxChanged = true
+        statusSkybox.Text = "Небо изменено! ID: " .. assetId
+        statusSkybox.TextColor3 = Color3.fromRGB(120, 200, 120)
+        showNotification("🌤️ Небо изменено на ID: " .. assetId, false)
+        return true
+    else
+        statusSkybox.Text = "Ошибка: неверный ID"
+        statusSkybox.TextColor3 = Color3.fromRGB(200, 120, 120)
+        return false
+    end
+end
+
+local function resetSkybox()
+    if originalSkybox then
+        local sky = lighting:FindFirstChildWhichIsA("Sky")
+        if not sky then
+            sky = Instance.new("Sky")
+            sky.Parent = lighting
+        end
+        sky.SkyboxBk = originalSkybox.SkyboxBk
+        sky.SkyboxDn = originalSkybox.SkyboxDn
+        sky.SkyboxFt = originalSkybox.SkyboxFt
+        sky.SkyboxLf = originalSkybox.SkyboxLf
+        sky.SkyboxRt = originalSkybox.SkyboxRt
+        sky.SkyboxUp = originalSkybox.SkyboxUp
+        skyboxChanged = false
+        statusSkybox.Text = "Небо сброшено"
+        statusSkybox.TextColor3 = Color3.fromRGB(140, 140, 155)
+        showNotification("🔄 Небо сброшено до оригинала", false)
+    else
+        statusSkybox.Text = "Нечего сбрасывать"
+        statusSkybox.TextColor3 = Color3.fromRGB(200, 120, 120)
+    end
+end
+
 -- === МНОЖЕСТВЕННЫЙ ESP ===
-local espPlayers = {}  -- таблица с игроками, на которых включен ESP
-local espHighlights = {}  -- таблица с Highlight для каждого игрока
-local nameTags = {}  -- таблица с никнеймами
+local espPlayers = {}
+local nameTags = {}
 
 local function createNametag(character, playerName)
     local billboard = Instance.new("BillboardGui")
@@ -201,10 +287,6 @@ local function addESP(targetPlayer)
     highlight.OutlineColor = Color3.fromRGB(0, 0, 0)
     highlight.FillTransparency = 0.5
     highlight.OutlineTransparency = 0
-    
-    local function updateHighlight()
-        highlight.Parent = targetPlayer.Character
-    end
     
     if targetPlayer.Character then
         highlight.Parent = targetPlayer.Character
@@ -255,7 +337,6 @@ local function removeAllESP()
     end
 end
 
--- Обновление отображения списка ESP игроков
 local function updateESPListDisplay()
     for _, child in ipairs(espPlayersList:GetChildren()) do
         if child:IsA("TextButton") then
@@ -282,13 +363,21 @@ local function updateESPListDisplay()
         btn.MouseButton1Click:Connect(function()
             removeESP(plr)
             showNotification("❌ ESP выключен для " .. plr.Name, false)
+            local count = 0
+            for _ in pairs(espPlayers) do count = count + 1 end
+            if count == 0 then
+                statusESP.Text = "ESP Status: Нет активных"
+                statusESP.TextColor3 = Color3.fromRGB(140, 140, 155)
+            else
+                statusESP.Text = "ESP Status: Активно (" .. count .. " игроков)"
+                statusESP.TextColor3 = Color3.fromRGB(170, 190, 170)
+            end
         end)
         y = y + 30
     end
     espPlayersList.CanvasSize = UDim2.new(0, 0, 0, y + 10)
 end
 
--- Обновление списка доступных игроков
 local function updatePlayersList()
     for _, child in ipairs(playersList:GetChildren()) do
         if child:IsA("TextButton") then
@@ -441,8 +530,8 @@ local function showNotification(message, isError)
 end
 
 -- --- ОСНОВНОЕ ОКНО ---
-frame.Size = UDim2.new(0, 550, 0, 700)
-frame.Position = UDim2.new(0.5, -275, 0.5, -350)
+frame.Size = UDim2.new(0, 550, 0, 800)
+frame.Position = UDim2.new(0.5, -275, 0.5, -400)
 frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 frame.BackgroundTransparency = 0.25
 frame.BorderSizePixel = 1
@@ -649,8 +738,68 @@ btnThirdPerson.MouseButton1Click:Connect(function()
     setThirdPerson(not thirdPersonActive)
 end)
 
--- === 4. ESP (множественный) ===
-local espSection = createSection("ESP - МНОЖЕСТВЕННЫЙ", 350)
+-- === 4. SKYBOX ===
+local skyboxSection = createSection("SKYBOX CHANGER", 130)
+
+skyboxInputBox.Size = UDim2.new(0.6, 0, 0, 35)
+skyboxInputBox.Position = UDim2.new(0, 10, 0, 35)
+skyboxInputBox.PlaceholderText = "Введите ID неба (например: 91458024)"
+skyboxInputBox.Text = ""
+skyboxInputBox.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+skyboxInputBox.BackgroundTransparency = 0.3
+skyboxInputBox.TextColor3 = Color3.fromRGB(210, 210, 220)
+skyboxInputBox.TextSize = 12
+skyboxInputBox.Font = Enum.Font.Gotham
+skyboxInputBox.BorderSizePixel = 1
+skyboxInputBox.BorderColor3 = Color3.fromRGB(45, 45, 55)
+skyboxInputBox.ClearTextOnFocus = false
+skyboxInputBox.Parent = skyboxSection
+
+btnSkybox.Size = UDim2.new(0.28, 0, 0, 35)
+btnSkybox.Position = UDim2.new(0.62, 0, 0, 35)
+btnSkybox.Text = "ПРИМЕНИТЬ"
+btnSkybox.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+btnSkybox.BackgroundTransparency = 0.3
+btnSkybox.TextColor3 = Color3.fromRGB(200, 200, 210)
+btnSkybox.TextSize = 11
+btnSkybox.Font = Enum.Font.Gotham
+btnSkybox.BorderSizePixel = 1
+btnSkybox.BorderColor3 = Color3.fromRGB(45, 45, 55)
+btnSkybox.Parent = skyboxSection
+setupButtonHover(btnSkybox)
+
+btnResetSkybox.Size = UDim2.new(0.28, 0, 0, 35)
+btnResetSkybox.Position = UDim2.new(0.62, 0, 0, 75)
+btnResetSkybox.Text = "СБРОСИТЬ"
+btnResetSkybox.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+btnResetSkybox.BackgroundTransparency = 0.3
+btnResetSkybox.TextColor3 = Color3.fromRGB(200, 200, 210)
+btnResetSkybox.TextSize = 11
+btnResetSkybox.Font = Enum.Font.Gotham
+btnResetSkybox.BorderSizePixel = 1
+btnResetSkybox.BorderColor3 = Color3.fromRGB(45, 45, 55)
+btnResetSkybox.Parent = skyboxSection
+setupButtonHover(btnResetSkybox)
+
+statusSkybox.Size = UDim2.new(1, -20, 0, 20)
+statusSkybox.Position = UDim2.new(0, 10, 0, 115)
+statusSkybox.Text = "Статус: готов"
+statusSkybox.TextColor3 = Color3.fromRGB(140, 140, 155)
+statusSkybox.TextSize = 11
+statusSkybox.TextXAlignment = Enum.TextXAlignment.Left
+statusSkybox.BackgroundTransparency = 1
+statusSkybox.Parent = skyboxSection
+
+btnSkybox.MouseButton1Click:Connect(function()
+    applySkybox(skyboxInputBox.Text)
+end)
+
+btnResetSkybox.MouseButton1Click:Connect(function()
+    resetSkybox()
+end)
+
+-- === 5. ESP (множественный) ===
+local espSection = createSection("ESP - МНОЖЕСТВЕННЫЙ", 370)
 
 playerDropdown.Size = UDim2.new(1, -20, 0, 35)
 playerDropdown.Position = UDim2.new(0, 10, 0, 35)
@@ -708,9 +857,8 @@ btnRemoveESP.BorderColor3 = Color3.fromRGB(45, 45, 55)
 btnRemoveESP.Parent = espSection
 setupButtonHover(btnRemoveESP)
 
--- Список доступных игроков
 local playersLabel = Instance.new("TextLabel")
-playersLabel.Size = UDim2.new(1, -20, 0, 20)
+playersLabel.Size = UDim2.new(0.48, 0, 0, 20)
 playersLabel.Position = UDim2.new(0, 10, 0, 115)
 playersLabel.BackgroundTransparency = 1
 playersLabel.Text = "Доступные игроки:"
@@ -719,7 +867,7 @@ playersLabel.TextSize = 12
 playersLabel.TextXAlignment = Enum.TextXAlignment.Left
 playersLabel.Parent = espSection
 
-playersList.Size = UDim2.new(0.48, 0, 0, 100)
+playersList.Size = UDim2.new(0.48, 0, 0, 120)
 playersList.Position = UDim2.new(0, 10, 0, 135)
 playersList.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
 playersList.BackgroundTransparency = 0.2
@@ -728,10 +876,9 @@ playersList.BorderColor3 = Color3.fromRGB(45, 45, 55)
 playersList.ScrollBarThickness = 6
 playersList.Parent = espSection
 
--- Список ESP игроков
 local espPlayersLabel = Instance.new("TextLabel")
-espPlayersLabel.Size = UDim2.new(1, -20, 0, 20)
-espPlayersLabel.Position = UDim2.new(0, 250, 0, 115)
+espPlayersLabel.Size = UDim2.new(0.48, 0, 0, 20)
+espPlayersLabel.Position = UDim2.new(0.51, 0, 0, 115)
 espPlayersLabel.BackgroundTransparency = 1
 espPlayersLabel.Text = "ESP активен для:"
 espPlayersLabel.TextColor3 = Color3.fromRGB(160, 160, 175)
@@ -739,7 +886,7 @@ espPlayersLabel.TextSize = 12
 espPlayersLabel.TextXAlignment = Enum.TextXAlignment.Left
 espPlayersLabel.Parent = espSection
 
-espPlayersList.Size = UDim2.new(0.48, 0, 0, 100)
+espPlayersList.Size = UDim2.new(0.48, 0, 0, 120)
 espPlayersList.Position = UDim2.new(0.51, 0, 0, 135)
 espPlayersList.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
 espPlayersList.BackgroundTransparency = 0.2
@@ -748,12 +895,8 @@ espPlayersList.BorderColor3 = Color3.fromRGB(45, 45, 55)
 espPlayersList.ScrollBarThickness = 6
 espPlayersList.Parent = espSection
 
-local playersListLayout = Instance.new("UIListLayout")
-playersListLayout.Padding = UDim.new(0, 5)
-playersListLayout.Parent = playersList
-
 statusESP.Size = UDim2.new(1, -20, 0, 25)
-statusESP.Position = UDim2.new(0, 10, 0, 250)
+statusESP.Position = UDim2.new(0, 10, 0, 270)
 statusESP.Text = "ESP Status: Нет активных"
 statusESP.TextColor3 = Color3.fromRGB(140, 140, 155)
 statusESP.TextSize = 12
@@ -761,7 +904,6 @@ statusESP.TextXAlignment = Enum.TextXAlignment.Left
 statusESP.BackgroundTransparency = 1
 statusESP.Parent = espSection
 
--- Обработчики ESP
 refreshBtn.MouseButton1Click:Connect(function()
     updatePlayersList()
     showNotification("📋 Список игроков обновлён", false)
@@ -779,8 +921,11 @@ btnAddESP.MouseButton1Click:Connect(function()
         return
     end
     if addESP(target) then
+        local count = 0
+        for _ in pairs(espPlayers) do count = count + 1 end
         showNotification("✅ ESP добавлен для " .. target.Name, false)
-        statusESP.Text = "ESP Status: Активно (" .. table.concat(espPlayers, ", ") .. ")"
+        statusESP.Text = "ESP Status: Активно (" .. count .. " игроков)"
+        statusESP.TextColor3 = Color3.fromRGB(170, 190, 170)
     else
         showNotification("❌ Уже в ESP или нельзя добавить себя", true)
     end
@@ -791,9 +936,10 @@ btnRemoveESP.MouseButton1Click:Connect(function()
     removeAllESP()
     showNotification("🗑️ Весь ESP отключён", false)
     statusESP.Text = "ESP Status: Нет активных"
+    statusESP.TextColor3 = Color3.fromRGB(140, 140, 155)
 end)
 
--- === 5. НАСТРОЙКА БИНДА ===
+-- === 6. НАСТРОЙКА БИНДА ===
 bindSection.Size = UDim2.new(1, 0, 0, 80)
 bindSection.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 bindSection.BackgroundTransparency = 0.4
@@ -953,10 +1099,18 @@ btnRes.MouseButton1Click:Connect(function()
     setResolution(not resActive)
 end)
 
--- Обработка выхода игроков
 game.Players.PlayerRemoving:Connect(function(leavingPlayer)
     if espPlayers[leavingPlayer] then
         removeESP(leavingPlayer)
+        local count = 0
+        for _ in pairs(espPlayers) do count = count + 1 end
+        if count == 0 then
+            statusESP.Text = "ESP Status: Нет активных"
+            statusESP.TextColor3 = Color3.fromRGB(140, 140, 155)
+        else
+            statusESP.Text = "ESP Status: Активно (" .. count .. " игроков)"
+            statusESP.TextColor3 = Color3.fromRGB(170, 190, 170)
+        end
         showNotification("🔴 " .. leavingPlayer.Name .. " вышел из игры, ESP отключён", true)
     end
 end)
@@ -965,4 +1119,4 @@ updatePlayersList()
 updateBindDisplay()
 updateESPListDisplay()
 
-print("Goxie Script Menu loaded | Press " .. currentBind.Name .. " to open/close | v3.0 - 3rd Person + Multiple ESP")
+print("Goxie Script Menu loaded | Press " .. currentBind.Name .. " to open/close | v3.2 - Skybox Changer added")
