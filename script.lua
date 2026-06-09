@@ -1,4 +1,4 @@
--- Goxie Script Menu (полная версия)
+-- Goxie Script Menu (плавное меню + подсветка кнопок)
 -- Нажми Right Shift для открытия меню
 
 local player = game.Players.LocalPlayer
@@ -31,13 +31,56 @@ gui.IgnoreGuiInset = true
 
 frame.Visible = false
 
+-- === ПЛАВНОЕ ПОЯВЛЕНИЕ/ИСЧЕЗНОВЕНИЕ МЕНЮ ===
+local TweenService = game:GetService("TweenService")
+
+local function showMenu()
+    frame.Visible = true
+    frame.BackgroundTransparency = 0.3
+    local tween = TweenService:Create(frame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.25})
+    tween:Play()
+end
+
+local function hideMenu()
+    local tween = TweenService:Create(frame, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency = 0.3})
+    tween:Play()
+    wait(0.15)
+    frame.Visible = false
+end
+
 local UserInputService = game:GetService("UserInputService")
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.KeyCode == Enum.KeyCode.RightShift then
-        frame.Visible = not frame.Visible
+        if frame.Visible then
+            hideMenu()
+        else
+            showMenu()
+        end
     end
 end)
+
+-- === ФУНКЦИЯ ДЛЯ ПОДСВЕТКИ КНОПОК ===
+local function setupButtonHover(button)
+    local defaultBg = button.BackgroundTransparency
+    local defaultColor = button.BackgroundColor3
+    
+    button.MouseEnter:Connect(function()
+        local tween = TweenService:Create(button, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            BackgroundTransparency = 0.1,
+            BackgroundColor3 = Color3.fromRGB(45, 45, 65)
+        })
+        tween:Play()
+    end)
+    
+    button.MouseLeave:Connect(function()
+        local tween = TweenService:Create(button, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            BackgroundTransparency = defaultBg,
+            BackgroundColor3 = defaultColor
+        })
+        tween:Play()
+    end)
+end
 
 notificationContainer.Size = UDim2.new(0, 300, 0, 200)
 notificationContainer.Position = UDim2.new(1, -310, 0, 10)
@@ -53,7 +96,7 @@ local function showNotification(message, isError)
     notif.BorderSizePixel = 1
     notif.BorderColor3 = Color3.fromRGB(60, 60, 80)
     notif.Parent = notificationContainer
-    
+
     local text = Instance.new("TextLabel")
     text.Size = UDim2.new(1, 0, 1, 0)
     text.BackgroundTransparency = 1
@@ -63,17 +106,17 @@ local function showNotification(message, isError)
     text.Font = Enum.Font.Gotham
     text.TextXAlignment = Enum.TextXAlignment.Center
     text.Parent = notif
-    
+
     notif.Position = UDim2.new(0, 5, 0, -50)
-    local tween = game:GetService("TweenService"):Create(notif, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.new(0, 5, 0, 0)})
+    local tween = TweenService:Create(notif, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.new(0, 5, 0, 0)})
     tween:Play()
-    
+
     local function shiftNotifications()
         local y = 0
         for _, child in ipairs(notificationContainer:GetChildren()) do
             if child:IsA("Frame") and child ~= notif then
                 local targetY = y
-                local t = game:GetService("TweenService"):Create(child, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.new(0, 5, 0, targetY)})
+                local t = TweenService:Create(child, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.new(0, 5, 0, targetY)})
                 t:Play()
                 y = y + 45
             end
@@ -81,17 +124,17 @@ local function showNotification(message, isError)
         notif.Position = UDim2.new(0, 5, 0, y)
     end
     shiftNotifications()
-    
+
     game:GetService("Debris"):AddItem(notif, 3)
     wait(2.8)
-    local fadeOut = game:GetService("TweenService"):Create(notif, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1})
+    local fadeOut = TweenService:Create(notif, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1})
     fadeOut:Play()
     fadeOut.Completed:Connect(function()
         notif:Destroy()
         local y = 0
         for _, child in ipairs(notificationContainer:GetChildren()) do
             if child:IsA("Frame") then
-                local t = game:GetService("TweenService"):Create(child, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.new(0, 5, 0, y)})
+                local t = TweenService:Create(child, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.new(0, 5, 0, y)})
                 t:Play()
                 y = y + 45
             end
@@ -130,8 +173,9 @@ closeBtn.Font = Enum.Font.GothamBold
 closeBtn.TextSize = 18
 closeBtn.Parent = frame
 closeBtn.MouseButton1Click:Connect(function()
-    frame.Visible = false
+    hideMenu()
 end)
+setupButtonHover(closeBtn)
 
 scrollContainer.Size = UDim2.new(1, -20, 1, -55)
 scrollContainer.Position = UDim2.new(0, 10, 0, 50)
@@ -189,7 +233,7 @@ local function createSection(titleText, height)
     section.BorderSizePixel = 1
     section.BorderColor3 = Color3.fromRGB(35, 35, 45)
     section.Parent = scrollContainer
-    
+
     local sectionTitle = Instance.new("TextLabel")
     sectionTitle.Size = UDim2.new(1, 0, 0, 30)
     sectionTitle.BackgroundTransparency = 1
@@ -199,7 +243,7 @@ local function createSection(titleText, height)
     sectionTitle.Font = Enum.Font.GothamBold
     sectionTitle.TextXAlignment = Enum.TextXAlignment.Left
     sectionTitle.Parent = section
-    
+
     return section
 end
 
@@ -215,6 +259,7 @@ btnFOV.Font = Enum.Font.Gotham
 btnFOV.BorderSizePixel = 1
 btnFOV.BorderColor3 = Color3.fromRGB(45, 45, 55)
 btnFOV.Parent = fovSection
+setupButtonHover(btnFOV)
 
 statusFOV.Size = UDim2.new(1, -20, 0, 20)
 statusFOV.Position = UDim2.new(0, 10, 0, 80)
@@ -237,6 +282,7 @@ btnRes.Font = Enum.Font.Gotham
 btnRes.BorderSizePixel = 1
 btnRes.BorderColor3 = Color3.fromRGB(45, 45, 55)
 btnRes.Parent = resSection
+setupButtonHover(btnRes)
 
 statusRes.Size = UDim2.new(1, -20, 0, 20)
 statusRes.Position = UDim2.new(0, 10, 0, 80)
@@ -274,10 +320,11 @@ refreshBtn.Font = Enum.Font.Gotham
 refreshBtn.BorderSizePixel = 1
 refreshBtn.BorderColor3 = Color3.fromRGB(45, 45, 55)
 refreshBtn.Parent = espSection
+setupButtonHover(refreshBtn)
 
 btnESP.Size = UDim2.new(0.48, 0, 0, 30)
 btnESP.Position = UDim2.new(0.51, 0, 0, 75)
-btnESP.Text = "ВКЛЮЧИТЬ ESP"
+btnESP.Text = "ESP ON"
 btnESP.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 btnESP.BackgroundTransparency = 0.3
 btnESP.TextColor3 = Color3.fromRGB(200, 200, 210)
@@ -286,6 +333,7 @@ btnESP.Font = Enum.Font.Gotham
 btnESP.BorderSizePixel = 1
 btnESP.BorderColor3 = Color3.fromRGB(45, 45, 55)
 btnESP.Parent = espSection
+setupButtonHover(btnESP)
 
 playersList.Size = UDim2.new(1, -20, 0, 70)
 playersList.Position = UDim2.new(0, 10, 0, 110)
@@ -399,7 +447,7 @@ local function createNametag(character, playerName)
     billboard.StudsOffset = Vector3.new(0, 2.5, 0)
     billboard.AlwaysOnTop = true
     billboard.Parent = character
-    
+
     local textLabel = Instance.new("TextLabel")
     textLabel.Size = UDim2.new(1, 0, 1, 0)
     textLabel.BackgroundTransparency = 1
@@ -410,28 +458,28 @@ local function createNametag(character, playerName)
     textLabel.TextStrokeTransparency = 0.3
     textLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
     textLabel.Parent = billboard
-    
+
     return billboard
 end
 
 local function createHighlight(target, playerName)
     if espHighlight then espHighlight:Destroy() end
-    
+
     local highlight = Instance.new("Highlight")
     highlight.FillColor = Color3.fromRGB(0, 0, 0)
     highlight.OutlineColor = Color3.fromRGB(0, 0, 0)
     highlight.FillTransparency = 0.5
     highlight.OutlineTransparency = 0
     highlight.Parent = target.Character or target
-    
+
     if target.Character then
         local tag = createNametag(target.Character, playerName)
         nameTags[target] = {tag}
     end
-    
+
     local characterAddedCon
     local characterRemovingCon
-    
+
     local function onCharacterAdded(character)
         highlight.Parent = character
         if nameTags[target] then
@@ -443,7 +491,7 @@ local function createHighlight(target, playerName)
         local tag = createNametag(character, playerName)
         nameTags[target] = {tag}
     end
-    
+
     local function onCharacterRemoving()
         highlight.Parent = nil
         if nameTags[target] then
@@ -453,17 +501,17 @@ local function createHighlight(target, playerName)
             nameTags[target] = nil
         end
     end
-    
+
     if target.Character then
         highlight.Parent = target.Character
     end
-    
+
     characterAddedCon = target.CharacterAdded:Connect(onCharacterAdded)
     characterRemovingCon = target.CharacterRemoving:Connect(onCharacterRemoving)
-    
+
     table.insert(espConnections, characterAddedCon)
     table.insert(espConnections, characterRemovingCon)
-    
+
     return highlight
 end
 
@@ -473,7 +521,7 @@ local function updatePlayersList()
             child:Destroy()
         end
     end
-    
+
     local players = game.Players:GetPlayers()
     for _, plr in ipairs(players) do
         if plr ~= player then
@@ -488,13 +536,14 @@ local function updatePlayersList()
             btn.BorderSizePixel = 1
             btn.BorderColor3 = Color3.fromRGB(45, 45, 55)
             btn.Parent = playersList
-            
+            setupButtonHover(btn)
+
             btn.MouseButton1Click:Connect(function()
                 playerDropdown.Text = plr.Name
             end)
         end
     end
-    
+
     playersList.CanvasSize = UDim2.new(0, 0, 0, playersListLayout.AbsoluteContentSize.Y)
 end
 
@@ -513,7 +562,7 @@ local function setupLeaveTracker(target)
     if playerLeaveConnection then
         playerLeaveConnection:Disconnect()
     end
-    
+
     playerLeaveConnection = game.Players.PlayerRemoving:Connect(function(leavingPlayer)
         if leavingPlayer == targetPlayer then
             showNotification("🔴 " .. targetPlayer.Name .. " вышел из игры", true)
@@ -531,7 +580,7 @@ function setESP(enabled)
             showNotification("Ошибка: введите имя игрока", true)
             return false
         end
-        
+
         targetPlayer = game.Players:FindFirstChild(name)
         if not targetPlayer then
             statusESP.Text = "ESP Status: Игрок не найден"
@@ -539,30 +588,30 @@ function setESP(enabled)
             showNotification("❌ Игрок \"" .. name .. "\" не найден", true)
             return false
         end
-        
+
         if targetPlayer == player then
             statusESP.Text = "ESP Status: Нельзя подсвечивать себя"
             statusESP.TextColor3 = Color3.fromRGB(200, 120, 120)
             showNotification("❌ Нельзя подсвечивать себя", true)
             return false
         end
-        
+
         espHighlight = createHighlight(targetPlayer, targetPlayer.Name)
         espActive = true
         statusESP.Text = "ESP Status: ON - " .. targetPlayer.Name
         statusESP.TextColor3 = Color3.fromRGB(170, 190, 170)
-        btnESP.Text = "ВЫКЛЮЧИТЬ ESP"
+        btnESP.Text = "ESP OFF"
         showNotification("✅ ESP включен для " .. targetPlayer.Name, false)
-        
+
         setupLeaveTracker(targetPlayer)
-        
+
         return true
     else
         if espHighlight then espHighlight:Destroy() end
         espHighlight = nil
-        
+
         local oldTargetName = targetPlayer and targetPlayer.Name or "игрока"
-        
+
         if nameTags then
             for _, tags in pairs(nameTags) do
                 if tags then
@@ -573,27 +622,27 @@ function setESP(enabled)
             end
             nameTags = {}
         end
-        
+
         targetPlayer = nil
         espActive = false
         for _, con in pairs(espConnections) do
             if con then con:Disconnect() end
         end
         espConnections = {}
-        
+
         if playerLeaveConnection then
             playerLeaveConnection:Disconnect()
             playerLeaveConnection = nil
         end
-        
+
         statusESP.Text = "ESP Status: OFF"
         statusESP.TextColor3 = Color3.fromRGB(140, 140, 155)
-        btnESP.Text = "ВКЛЮЧИТЬ ESP"
-        
+        btnESP.Text = "ESP ON"
+
         if oldTargetName ~= "игрока" and oldTargetName then
             showNotification("⛔ ESP выключен для " .. oldTargetName, false)
         end
-        
+
         return true
     end
 end
@@ -608,4 +657,4 @@ end)
 
 updatePlayersList()
 
-print("Goxie Script Menu loaded | Press Right Shift to open/close")
+print("Goxie Script Menu loaded | Press Right Shift to open/close | v1.2 - Smooth + Hover Effects")
