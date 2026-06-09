@@ -1,4 +1,4 @@
--- Goxie Script Menu (ФИНАЛ: Skybox Changer + 3-е лицо + множественный ESP)
+-- Goxie Script Menu (ФИНАЛ: исправленный ESP + свободная камера 3-го лица)
 -- Нажмите настроенную клавишу для открытия меню (по умолчанию Right Shift)
 
 local player = game.Players.LocalPlayer
@@ -27,7 +27,7 @@ local btnSkybox = Instance.new("TextButton")
 local btnResetSkybox = Instance.new("TextButton")
 local statusSkybox = Instance.new("TextLabel")
 
--- --- ESP (множественный) ---
+-- --- ESP ---
 local playerDropdown = Instance.new("TextBox")
 local btnAddESP = Instance.new("TextButton")
 local btnRemoveESP = Instance.new("TextButton")
@@ -117,53 +117,115 @@ frame.Visible = false
 
 local UserInputService = game:GetService("UserInputService")
 local camera = workspace.CurrentCamera
+local RunService = game:GetService("RunService")
 
--- === 3-Е ЛИЦО ===
+-- === 3-Е ЛИЦО (СВОБОДНАЯ КАМЕРА) ===
 local thirdPersonActive = false
-local currentCameraOffset = 10
-local minOffset = 3
-local maxOffset = 20
+local thirdPersonCFrame = nil
 
 local function setThirdPerson(enabled)
     thirdPersonActive = enabled
     if enabled then
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local rootPart = player.Character.HumanoidRootPart
+            thirdPersonCFrame = CFrame.new(rootPart.Position - Vector3.new(10, 5, 10), rootPart.Position)
+            camera.CameraType = Enum.CameraType.Scriptable
+            camera.CFrame = thirdPersonCFrame
+        end
         statusThirdPerson.Text = "Status: ON (3 лицо)"
         statusThirdPerson.TextColor3 = Color3.fromRGB(170, 190, 170)
         btnThirdPerson.Text = "ВЫКЛЮЧИТЬ 3 ЛИЦО"
-        currentCameraOffset = 10
     else
+        camera.CameraType = Enum.CameraType.Custom
         statusThirdPerson.Text = "Status: OFF (1 лицо)"
         statusThirdPerson.TextColor3 = Color3.fromRGB(140, 140, 155)
         btnThirdPerson.Text = "ВКЛЮЧИТЬ 3 ЛИЦО"
-        camera.CameraType = Enum.CameraType.Custom
     end
 end
+
+-- Свободное управление камерой (правой кнопкой мыши)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if not thirdPersonActive then return end
+    
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if not thirdPersonActive then return end
+    
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        UserInputService.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
+    end
+end)
+
+-- Управление камерой мышью
+local mouse = player:GetMouse()
+local lastMousePos = Vector2.new()
+local rotating = false
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if not thirdPersonActive then return end
-    if input.KeyCode == Enum.KeyCode.ButtonWheelUp then
-        currentCameraOffset = math.min(currentCameraOffset + 1, maxOffset)
-    elseif input.KeyCode == Enum.KeyCode.ButtonWheelDown then
-        currentCameraOffset = math.max(currentCameraOffset - 1, minOffset)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        rotating = true
+        lastMousePos = UserInputService:GetMouseLocation()
     end
 end)
 
-game:GetService("RunService").RenderStepped:Connect(function()
-    if thirdPersonActive and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        local rootPart = player.Character.HumanoidRootPart
-        local direction = camera.CFrame.LookVector
-        local newPos = rootPart.Position - direction * currentCameraOffset + Vector3.new(0, 2, 0)
-        camera.CFrame = CFrame.new(newPos, rootPart.Position)
-        camera.CameraType = Enum.CameraType.Scriptable
-    elseif thirdPersonActive and not player.Character then
-        setThirdPerson(false)
+UserInputService.InputEnded:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        rotating = false
+    end
+end)
+
+local yaw = 45
+local pitch = 25
+local distance = 15
+
+RunService.RenderStepped:Connect(function()
+    if not thirdPersonActive then return end
+    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
+    
+    local rootPart = player.Character.HumanoidRootPart
+    
+    if rotating then
+        local delta = UserInputService:GetMouseLocation() - lastMousePos
+        yaw = yaw - delta.X * 0.5
+        pitch = math.clamp(pitch - delta.Y * 0.5, -80, 80)
+        lastMousePos = UserInputService:GetMouseLocation()
+    end
+    
+    local radYaw = math.rad(yaw)
+    local radPitch = math.rad(pitch)
+    local offset = Vector3.new(
+        math.cos(radYaw) * math.cos(radPitch) * distance,
+        math.sin(radPitch) * distance + 2,
+        math.sin(radYaw) * math.cos(radPitch) * distance
+    )
+    
+    local cameraPos = rootPart.Position + offset
+    camera.CFrame = CFrame.new(cameraPos, rootPart.Position)
+    camera.CameraType = Enum.CameraType.Scriptable
+end)
+
+-- Обработка колёсика мыши для приближения/отдаления
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if not thirdPersonActive then return end
+    if input.KeyCode == Enum.KeyCode.ButtonWheelUp then
+        distance = math.max(distance - 1, 5)
+    elseif input.KeyCode == Enum.KeyCode.ButtonWheelDown then
+        distance = math.min(distance + 1, 30)
     end
 end)
 
 -- === SKYBOX ===
 local originalSkybox = nil
-local skyboxChanged = false
 
 local function saveOriginalSkybox()
     local sky = lighting:FindFirstChildWhichIsA("Sky")
@@ -217,7 +279,6 @@ local function applySkybox(id)
     end)
     
     if success then
-        skyboxChanged = true
         statusSkybox.Text = "Небо изменено! ID: " .. assetId
         statusSkybox.TextColor3 = Color3.fromRGB(120, 200, 120)
         showNotification("🌤️ Небо изменено на ID: " .. assetId, false)
@@ -242,7 +303,6 @@ local function resetSkybox()
         sky.SkyboxLf = originalSkybox.SkyboxLf
         sky.SkyboxRt = originalSkybox.SkyboxRt
         sky.SkyboxUp = originalSkybox.SkyboxUp
-        skyboxChanged = false
         statusSkybox.Text = "Небо сброшено"
         statusSkybox.TextColor3 = Color3.fromRGB(140, 140, 155)
         showNotification("🔄 Небо сброшено до оригинала", false)
@@ -612,7 +672,7 @@ local function updateFPS()
         fpsLabel.Text = "FPS: " .. currentFPS
     end
 end
-fpsConnection = game:GetService("RunService").RenderStepped:Connect(updateFPS)
+fpsConnection = RunService.RenderStepped:Connect(updateFPS)
 
 -- --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 local function createSection(titleText, height)
@@ -798,7 +858,7 @@ btnResetSkybox.MouseButton1Click:Connect(function()
     resetSkybox()
 end)
 
--- === 5. ESP (множественный) ===
+-- === 5. ESP ===
 local espSection = createSection("ESP - МНОЖЕСТВЕННЫЙ", 370)
 
 playerDropdown.Size = UDim2.new(1, -20, 0, 35)
@@ -1076,7 +1136,7 @@ local resolutionValue = 0.80
 local function setResolution(enabled)
     if enabled then
         if not resConnection then
-            resConnection = game:GetService("RunService").RenderStepped:Connect(function()
+            resConnection = RunService.RenderStepped:Connect(function()
                 camera.CFrame = camera.CFrame * CFrame.new(0, 0, 0, 1, 0, 0, 0, resolutionValue, 0, 0, 0, 1)
             end)
         end
@@ -1119,4 +1179,4 @@ updatePlayersList()
 updateBindDisplay()
 updateESPListDisplay()
 
-print("Goxie Script Menu loaded | Press " .. currentBind.Name .. " to open/close | v3.2 - Skybox Changer added")
+print("Goxie Script Menu loaded | Press " .. currentBind.Name .. " to open/close | v3.3 - Fixed ESP + Free 3rd Person Camera")
