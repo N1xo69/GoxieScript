@@ -1,4 +1,4 @@
--- Goxie Script Menu (ФИНАЛ: курсор не блокируется, играется звук)
+-- Goxie Script Menu (ФИНАЛ: поле ввода FOV + ТВОЙ ЗВУК при запуске)
 -- Нажмите настроенную клавишу для открытия меню (по умолчанию Right Shift)
 
 local player = game.Players.LocalPlayer
@@ -44,10 +44,7 @@ gui.Parent = game.CoreGui
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 
--- === НЕ БЛОКИРУЕМ КУРСОР, ПРОСТО ОСТАВЛЯЕМ КАК ЕСТЬ ===
--- (ничего не делаем с UserInputService.MouseBehavior)
-
--- === ЗВУК ПРИ ЗАПУСКЕ ===
+-- === ЗВУК ПРИ ЗАПУСКЕ (ТВОЙ ЗВУК) ===
 local function playStartupSound()
     local sound = Instance.new("Sound")
     sound.SoundId = "rbxassetid://82845990304289"
@@ -335,7 +332,7 @@ local function createSection(titleText, height)
     return section
 end
 
--- === 1. FOV ===
+-- === 1. FOV (с полем ввода) ===
 local fovSection = createSection("FOV LOCK", 140)
 
 btnFOV.Size = UDim2.new(1, -20, 0, 35)
@@ -860,4 +857,4 @@ end)
 updatePlayersList()
 updateBindDisplay()
 
-print("Goxie Script Menu loaded | Press " .. currentBind.Name .. " to open/close | v2.3 - No mouse lock, custom sound")
+print("Goxie Script Menu loaded | Press " .. currentBind.Name .. " to open/close | v2.1 - Твой звук + FOV input")
