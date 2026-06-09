@@ -1,4 +1,4 @@
--- Goxie Script Menu (ФИНАЛ: разблокированный курсор + твой звук)
+-- Goxie Script Menu (ФИНАЛ: курсор не блокируется, играется звук)
 -- Нажмите настроенную клавишу для открытия меню (по умолчанию Right Shift)
 
 local player = game.Players.LocalPlayer
@@ -44,27 +44,10 @@ gui.Parent = game.CoreGui
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 
--- === РАЗБЛОКИРОВКА КУРСОРА МЫШИ ===
-local UserInputService = game:GetService("UserInputService")
-local mouse = player:GetMouse()
+-- === НЕ БЛОКИРУЕМ КУРСОР, ПРОСТО ОСТАВЛЯЕМ КАК ЕСТЬ ===
+-- (ничего не делаем с UserInputService.MouseBehavior)
 
-local function setMouseLock(state)
-    UserInputService.MouseBehavior = state and Enum.MouseBehavior.Default or Enum.MouseBehavior.LockCurrentPosition
-end
-
--- Разблокируем курсор при запуске скрипта
-setMouseLock(true)
-
--- При открытии меню блокируем/разблокируем курсор в зависимости от видимости
-frame:GetPropertyChangedSignal("Visible"):Connect(function()
-    if frame.Visible then
-        setMouseLock(true)  -- Курсор свободен при открытом меню
-    else
-        setMouseLock(false) -- Курсор заблокирован (игровой режим) когда меню закрыто
-    end
-end)
-
--- === ЗВУК ПРИ ЗАПУСКЕ (ТВОЙ ЗВУК) ===
+-- === ЗВУК ПРИ ЗАПУСКЕ ===
 local function playStartupSound()
     local sound = Instance.new("Sound")
     sound.SoundId = "rbxassetid://82845990304289"
@@ -124,6 +107,8 @@ loadingFrame:Destroy()
 blurEffect:Destroy()
 
 frame.Visible = false
+
+local UserInputService = game:GetService("UserInputService")
 
 -- === НАСТРОЙКА БИНДА ===
 local currentBind = Enum.KeyCode.RightShift
@@ -350,7 +335,7 @@ local function createSection(titleText, height)
     return section
 end
 
--- === 1. FOV (с полем ввода) ===
+-- === 1. FOV ===
 local fovSection = createSection("FOV LOCK", 140)
 
 btnFOV.Size = UDim2.new(1, -20, 0, 35)
@@ -875,4 +860,4 @@ end)
 updatePlayersList()
 updateBindDisplay()
 
-print("Goxie Script Menu loaded | Press " .. currentBind.Name .. " to open/close | v2.2 - Unlocked cursor + custom sound")
+print("Goxie Script Menu loaded | Press " .. currentBind.Name .. " to open/close | v2.3 - No mouse lock, custom sound")
