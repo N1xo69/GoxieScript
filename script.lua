@@ -1,4 +1,4 @@
--- Goxie Script Menu (ФИНАЛ: Исправлены кнопки ESP и настройка бинда)
+-- Goxie Script Menu (ФИНАЛ: разблокированный курсор + твой звук)
 -- Нажмите настроенную клавишу для открытия меню (по умолчанию Right Shift)
 
 local player = game.Players.LocalPlayer
@@ -13,9 +13,7 @@ local scrollList = Instance.new("UIListLayout")
 -- --- Функции ---
 local btnFOV = Instance.new("TextButton")
 local statusFOV = Instance.new("TextLabel")
-local fovSlider = Instance.new("Frame")
-local fovSliderButton = Instance.new("TextButton")
-local fovValueLabel = Instance.new("TextLabel")
+local fovInputBox = Instance.new("TextBox")
 local btnRes = Instance.new("TextButton")
 local statusRes = Instance.new("TextLabel")
 
@@ -35,25 +33,106 @@ local bindStatus = Instance.new("TextLabel")
 local fpsLabel = Instance.new("TextLabel")
 local notificationContainer = Instance.new("Frame")
 
+-- --- ЗАГРУЗОЧНЫЙ ЭКРАН ---
+local loadingFrame = Instance.new("Frame")
+local blurEffect = Instance.new("BlurEffect")
+local loadingText = Instance.new("TextLabel")
+local loadingSubText = Instance.new("TextLabel")
+
 gui.Name = "GoxieScriptGUI"
 gui.Parent = game.CoreGui
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 
+-- === РАЗБЛОКИРОВКА КУРСОРА МЫШИ ===
+local UserInputService = game:GetService("UserInputService")
+local mouse = player:GetMouse()
+
+local function setMouseLock(state)
+    UserInputService.MouseBehavior = state and Enum.MouseBehavior.Default or Enum.MouseBehavior.LockCurrentPosition
+end
+
+-- Разблокируем курсор при запуске скрипта
+setMouseLock(true)
+
+-- При открытии меню блокируем/разблокируем курсор в зависимости от видимости
+frame:GetPropertyChangedSignal("Visible"):Connect(function()
+    if frame.Visible then
+        setMouseLock(true)  -- Курсор свободен при открытом меню
+    else
+        setMouseLock(false) -- Курсор заблокирован (игровой режим) когда меню закрыто
+    end
+end)
+
+-- === ЗВУК ПРИ ЗАПУСКЕ (ТВОЙ ЗВУК) ===
+local function playStartupSound()
+    local sound = Instance.new("Sound")
+    sound.SoundId = "rbxassetid://82845990304289"
+    sound.Volume = 0.6
+    sound.Parent = gui
+    sound:Play()
+    game:GetService("Debris"):AddItem(sound, 5)
+end
+
+-- === ЗАГРУЗОЧНЫЙ ЭКРАН ===
+local lighting = game:GetService("Lighting")
+blurEffect.Size = 0
+blurEffect.Parent = lighting
+
+loadingFrame.Size = UDim2.new(1, 0, 1, 0)
+loadingFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+loadingFrame.BackgroundTransparency = 0.15
+loadingFrame.Parent = gui
+
+loadingText.Size = UDim2.new(0, 400, 0, 50)
+loadingText.Position = UDim2.new(0.5, -200, 0.5, -60)
+loadingText.BackgroundTransparency = 1
+loadingText.Text = "Goxie Script"
+loadingText.TextColor3 = Color3.fromRGB(255, 255, 255)
+loadingText.TextSize = 40
+loadingText.Font = Enum.Font.GothamBold
+loadingText.TextXAlignment = Enum.TextXAlignment.Center
+loadingText.Parent = loadingFrame
+
+loadingSubText.Size = UDim2.new(0, 300, 0, 30)
+loadingSubText.Position = UDim2.new(0.5, -150, 0.5, -10)
+loadingSubText.BackgroundTransparency = 1
+loadingSubText.Text = "Представляет..."
+loadingSubText.TextColor3 = Color3.fromRGB(200, 200, 200)
+loadingSubText.TextSize = 20
+loadingSubText.Font = Enum.Font.Gotham
+loadingSubText.TextXAlignment = Enum.TextXAlignment.Center
+loadingSubText.Parent = loadingFrame
+
+-- Запускаем звук
+playStartupSound()
+
+-- Анимация размытия
+for i = 0, 20 do
+    blurEffect.Size = i
+    wait(0.02)
+end
+
+wait(1)
+
+for i = 20, 0, -1 do
+    blurEffect.Size = i
+    wait(0.02)
+end
+
+loadingFrame:Destroy()
+blurEffect:Destroy()
+
 frame.Visible = false
 
-local UserInputService = game:GetService("UserInputService")
-
--- === НАСТРОЙКА БИНДА (РАБОТАЕТ) ===
+-- === НАСТРОЙКА БИНДА ===
 local currentBind = Enum.KeyCode.RightShift
 local isWaitingForBind = false
 
 local function updateBindDisplay()
-    if bindButton then
-        bindButton.Text = currentBind.Name
-    end
+    if bindButton then bindButton.Text = currentBind.Name end
     if bindStatus then
-        bindStatus.Text = "Текущий бинд: " .. currentBind.Name .. " | Нажмите на кнопку, чтобы изменить"
+        bindStatus.Text = "Текущий бинд: " .. currentBind.Name .. " | Нажми на кнопку, чтобы изменить"
         bindStatus.TextColor3 = Color3.fromRGB(170, 190, 170)
     end
 end
@@ -75,7 +154,7 @@ local function onInputBegan(input, gameProcessed)
             if bindStatus then
                 bindStatus.Text = "Готово! Новый бинд: " .. currentBind.Name
                 wait(1)
-                bindStatus.Text = "Нажмите на кнопку, чтобы изменить бинд"
+                bindStatus.Text = "Нажми на кнопку, чтобы изменить бинд"
                 bindStatus.TextColor3 = Color3.fromRGB(140, 140, 155)
             end
         end
@@ -164,8 +243,8 @@ local function showNotification(message, isError)
 end
 
 -- --- ОСНОВНОЕ ОКНО ---
-frame.Size = UDim2.new(0, 450, 0, 660) -- Высота увеличена
-frame.Position = UDim2.new(0.5, -225, 0.5, -330)
+frame.Size = UDim2.new(0, 450, 0, 650)
+frame.Position = UDim2.new(0.5, -225, 0.5, -325)
 frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 frame.BackgroundTransparency = 0.25
 frame.BorderSizePixel = 1
@@ -271,8 +350,9 @@ local function createSection(titleText, height)
     return section
 end
 
--- === 1. FOV ===
-local fovSection = createSection("FOV LOCK", 160)
+-- === 1. FOV (с полем ввода) ===
+local fovSection = createSection("FOV LOCK", 140)
+
 btnFOV.Size = UDim2.new(1, -20, 0, 35)
 btnFOV.Position = UDim2.new(0, 10, 0, 35)
 btnFOV.Text = "ACTIVATE FOV LOCK"
@@ -286,78 +366,40 @@ btnFOV.BorderColor3 = Color3.fromRGB(45, 45, 55)
 btnFOV.Parent = fovSection
 setupButtonHover(btnFOV)
 
-local sliderBg = Instance.new("Frame")
-sliderBg.Size = UDim2.new(0.7, 0, 0, 6)
-sliderBg.Position = UDim2.new(0.15, 0, 0, 80)
-sliderBg.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-sliderBg.BorderSizePixel = 0
-sliderBg.Parent = fovSection
+-- Поле ввода значения FOV
+local fovInputLabel = Instance.new("TextLabel")
+fovInputLabel.Size = UDim2.new(0.4, 0, 0, 25)
+fovInputLabel.Position = UDim2.new(0, 10, 0, 80)
+fovInputLabel.BackgroundTransparency = 1
+fovInputLabel.Text = "Значение FOV (80-140):"
+fovInputLabel.TextColor3 = Color3.fromRGB(160, 160, 175)
+fovInputLabel.TextSize = 12
+fovInputLabel.TextXAlignment = Enum.TextXAlignment.Left
+fovInputLabel.Parent = fovSection
 
-fovSlider.Size = UDim2.new(0, 10, 0, 10)
-fovSlider.BackgroundColor3 = Color3.fromRGB(200, 200, 210)
-fovSlider.BorderSizePixel = 0
-fovSlider.Parent = sliderBg
-
-fovSliderButton.Size = UDim2.new(0, 14, 0, 14)
-fovSliderButton.Position = UDim2.new(0.5, -7, 0, -4)
-fovSliderButton.BackgroundColor3 = Color3.fromRGB(150, 150, 170)
-fovSliderButton.BorderSizePixel = 1
-fovSliderButton.BorderColor3 = Color3.fromRGB(80, 80, 100)
-fovSliderButton.Text = ""
-fovSliderButton.Parent = fovSlider
-setupButtonHover(fovSliderButton)
-
-fovValueLabel.Size = UDim2.new(0.2, 0, 0, 20)
-fovValueLabel.Position = UDim2.new(0.87, 0, 0, 77)
-fovValueLabel.BackgroundTransparency = 1
-fovValueLabel.Text = "85"
-fovValueLabel.TextColor3 = Color3.fromRGB(200, 200, 210)
-fovValueLabel.TextSize = 12
-fovValueLabel.Font = Enum.Font.GothamBold
-fovValueLabel.TextXAlignment = Enum.TextXAlignment.Center
-fovValueLabel.Parent = fovSection
+fovInputBox.Size = UDim2.new(0.3, 0, 0, 30)
+fovInputBox.Position = UDim2.new(0.55, 0, 0, 77)
+fovInputBox.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+fovInputBox.BackgroundTransparency = 0.3
+fovInputBox.TextColor3 = Color3.fromRGB(210, 210, 220)
+fovInputBox.TextSize = 13
+fovInputBox.Font = Enum.Font.Gotham
+fovInputBox.BorderSizePixel = 1
+fovInputBox.BorderColor3 = Color3.fromRGB(45, 45, 55)
+fovInputBox.Text = "85"
+fovInputBox.PlaceholderText = "85"
+fovInputBox.ClearTextOnFocus = true
+fovInputBox.Parent = fovSection
+setupButtonHover(fovInputBox)
 
 statusFOV.Size = UDim2.new(1, -20, 0, 20)
-statusFOV.Position = UDim2.new(0, 10, 0, 110)
+statusFOV.Position = UDim2.new(0, 10, 0, 115)
 statusFOV.Text = "Status: OFF"
 statusFOV.TextColor3 = Color3.fromRGB(140, 140, 155)
 statusFOV.TextSize = 12
 statusFOV.TextXAlignment = Enum.TextXAlignment.Left
 statusFOV.BackgroundTransparency = 1
 statusFOV.Parent = fovSection
-
-local currentFOVValue = 85
-local minFOV = 85
-local maxFOV = 140
-local isDragging = false
-
-local function updateSliderPosition(value)
-    local percent = (value - minFOV) / (maxFOV - minFOV)
-    local newX = percent * sliderBg.AbsoluteSize.X - (fovSlider.AbsoluteSize.X / 2)
-    fovSlider.Position = UDim2.new(0, math.clamp(newX, 0, sliderBg.AbsoluteSize.X - fovSlider.AbsoluteSize.X), 0, -2)
-    fovValueLabel.Text = tostring(math.floor(value))
-    currentFOVValue = math.floor(value)
-end
-
-fovSliderButton.MouseButton1Down:Connect(function()
-    isDragging = true
-    local mouse = player:GetMouse()
-    local connection = mouse.Move:Connect(function()
-        if isDragging then
-            local mouseX = mouse.X
-            local sliderAbsPos = sliderBg.AbsolutePosition.X
-            local sliderAbsSize = sliderBg.AbsoluteSize.X
-            local percent = (mouseX - sliderAbsPos) / sliderAbsSize
-            local newValue = minFOV + (maxFOV - minFOV) * math.clamp(percent, 0, 1)
-            updateSliderPosition(newValue)
-        end
-    end)
-    local releaseConnection = mouse.Button1Up:Connect(function()
-        isDragging = false
-        connection:Disconnect()
-        releaseConnection:Disconnect()
-    end)
-end)
 
 -- === 2. RESOLUTION ===
 local resSection = createSection("RESOLUTION MOD", 100)
@@ -400,11 +442,11 @@ playerDropdown.BorderColor3 = Color3.fromRGB(45, 45, 55)
 playerDropdown.ClearTextOnFocus = false
 playerDropdown.Parent = espSection
 
-local buttonWidth = 0.48
-local buttonSpacing = 0.52
+local buttonWidth = 0.44
+local buttonHeight = 28
 
-refreshBtn.Size = UDim2.new(buttonWidth, 0, 0, 30)
-refreshBtn.Position = UDim2.new(0, 10, 0, 75)
+refreshBtn.Size = UDim2.new(buttonWidth, 0, 0, buttonHeight)
+refreshBtn.Position = UDim2.new(0, 10, 0, 78)
 refreshBtn.Text = "Обновить список"
 refreshBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 refreshBtn.BackgroundTransparency = 0.3
@@ -416,8 +458,8 @@ refreshBtn.BorderColor3 = Color3.fromRGB(45, 45, 55)
 refreshBtn.Parent = espSection
 setupButtonHover(refreshBtn)
 
-btnESP.Size = UDim2.new(buttonWidth, 0, 0, 30) -- ТЕПЕРЬ ТОЧНО ТАКОЙ ЖЕ
-btnESP.Position = UDim2.new(buttonSpacing, 0, 0, 75)
+btnESP.Size = UDim2.new(buttonWidth, 0, 0, buttonHeight)
+btnESP.Position = UDim2.new(0.54, 0, 0, 78)
 btnESP.Text = "ESP ON"
 btnESP.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 btnESP.BackgroundTransparency = 0.3
@@ -430,7 +472,7 @@ btnESP.Parent = espSection
 setupButtonHover(btnESP)
 
 playersList.Size = UDim2.new(1, -20, 0, 70)
-playersList.Position = UDim2.new(0, 10, 0, 110)
+playersList.Position = UDim2.new(0, 10, 0, 115)
 playersList.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
 playersList.BackgroundTransparency = 0.2
 playersList.BorderSizePixel = 1
@@ -443,7 +485,7 @@ playersListLayout.Padding = UDim.new(0, 5)
 playersListLayout.Parent = playersList
 
 statusESP.Size = UDim2.new(1, -20, 0, 25)
-statusESP.Position = UDim2.new(0, 10, 0, 190)
+statusESP.Position = UDim2.new(0, 10, 0, 195)
 statusESP.Text = "ESP Status: OFF"
 statusESP.TextColor3 = Color3.fromRGB(140, 140, 155)
 statusESP.TextSize = 12
@@ -451,7 +493,7 @@ statusESP.TextXAlignment = Enum.TextXAlignment.Left
 statusESP.BackgroundTransparency = 1
 statusESP.Parent = espSection
 
--- === 4. НАСТРОЙКА БИНДА (ДОБАВЛЕНА) ===
+-- === 4. НАСТРОЙКА БИНДА ===
 bindSection.Size = UDim2.new(1, 0, 0, 80)
 bindSection.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 bindSection.BackgroundTransparency = 0.4
@@ -494,7 +536,7 @@ setupButtonHover(bindButton)
 bindStatus.Size = UDim2.new(1, -20, 0, 20)
 bindStatus.Position = UDim2.new(0, 10, 0, 60)
 bindStatus.BackgroundTransparency = 1
-bindStatus.Text = "Нажмите на кнопку, чтобы изменить бинд"
+bindStatus.Text = "Нажми на кнопку, чтобы изменить бинд"
 bindStatus.TextColor3 = Color3.fromRGB(140, 140, 155)
 bindStatus.TextSize = 11
 bindStatus.TextXAlignment = Enum.TextXAlignment.Left
@@ -504,7 +546,7 @@ bindButton.MouseButton1Click:Connect(function()
     if isWaitingForBind then
         isWaitingForBind = false
         bindButton.Text = currentBind.Name
-        bindStatus.Text = "Нажмите на кнопку, чтобы изменить бинд"
+        bindStatus.Text = "Нажми на кнопку, чтобы изменить бинд"
         bindStatus.TextColor3 = Color3.fromRGB(140, 140, 155)
     else
         isWaitingForBind = true
@@ -535,6 +577,23 @@ local fovConnection = nil
 local camera = workspace.CurrentCamera
 local currentFOV = 85
 
+-- Обработчик ввода FOV
+fovInputBox.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        local newValue = tonumber(fovInputBox.Text)
+        if newValue and newValue >= 80 and newValue <= 140 then
+            currentFOV = newValue
+            if fovActive then
+                camera.FieldOfView = currentFOV
+            end
+            showNotification("✅ FOV установлен на " .. currentFOV, false)
+        else
+            showNotification("❌ Введите число от 80 до 140", true)
+            fovInputBox.Text = tostring(currentFOV)
+        end
+    end
+end)
+
 local function setFOVLock(enabled)
     if enabled then
         if not fovConnection then
@@ -563,27 +622,6 @@ end
 
 btnFOV.MouseButton1Click:Connect(function()
     setFOVLock(not fovActive)
-end)
-
-local sliderConnection = nil
-fovSliderButton.MouseButton1Down:Connect(function()
-    sliderConnection = game:GetService("RunService").RenderStepped:Connect(function()
-        if isDragging and fovActive then
-            camera.FieldOfView = currentFOVValue
-            currentFOV = currentFOVValue
-        end
-    end)
-end)
-
-fovSliderButton.MouseButton1Up:Connect(function()
-    if sliderConnection then
-        sliderConnection:Disconnect()
-        sliderConnection = nil
-    end
-    if fovActive then
-        camera.FieldOfView = currentFOVValue
-        currentFOV = currentFOVValue
-    end
 end)
 
 -- === ЛОГИКА RESOLUTION ===
@@ -835,7 +873,6 @@ btnESP.MouseButton1Click:Connect(function()
 end)
 
 updatePlayersList()
-updateSliderPosition(85)
 updateBindDisplay()
 
-print("Goxie Script Menu loaded | Press " .. currentBind.Name .. " to open/close | v1.6 - FINAL")
+print("Goxie Script Menu loaded | Press " .. currentBind.Name .. " to open/close | v2.2 - Unlocked cursor + custom sound")
