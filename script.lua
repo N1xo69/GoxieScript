@@ -1,4 +1,4 @@
--- Goxie Script Menu (СТАБИЛЬНАЯ - с никнеймами, без дистанции)
+-- Goxie Script Menu (БЕЗ SKYBOX - ПОЛНАЯ ВЕРСИЯ)
 -- Нажмите Right Shift для открытия меню
 
 local player = game.Players.LocalPlayer
@@ -11,14 +11,12 @@ local closeBtn = Instance.new("TextButton")
 local tabsFrame = Instance.new("Frame")
 local tabFOV = Instance.new("TextButton")
 local tabResolution = Instance.new("TextButton")
-local tabSkybox = Instance.new("TextButton")
 local tabESP = Instance.new("TextButton")
 local tabMisc = Instance.new("TextButton")
 local tabSettings = Instance.new("TextButton")
 
 -- Контент
 local contentContainer = Instance.new("ScrollingFrame")
-local contentList = Instance.new("UIListLayout")
 
 -- --- FOV ---
 local fovToggleBtn = Instance.new("TextButton")
@@ -28,12 +26,6 @@ local fovInputBox = Instance.new("TextBox")
 -- --- RESOLUTION ---
 local resToggleBtn = Instance.new("TextButton")
 local resStatus = Instance.new("TextLabel")
-
--- --- SKYBOX ---
-local skyboxInput = Instance.new("TextBox")
-local skyboxApplyBtn = Instance.new("TextButton")
-local skyboxResetBtn = Instance.new("TextButton")
-local skyboxStatus = Instance.new("TextLabel")
 
 -- --- ESP ---
 local espInput = Instance.new("TextBox")
@@ -67,7 +59,7 @@ gui.IgnoreGuiInset = true
 -- === НАСТРОЙКИ ===
 local menuTransparency = 85
 local menuWidth = 500
-local menuHeight = 470
+local menuHeight = 400
 local currentBind = Enum.KeyCode.RightShift
 local waitingForBind = false
 
@@ -163,61 +155,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
--- === SKYBOX ===
-local originalSkybox = nil
-
-local function saveOriginalSkybox()
-    local sky = lighting:FindFirstChildWhichIsA("Sky")
-    if not sky then
-        sky = Instance.new("Sky")
-        sky.Parent = lighting
-    end
-    originalSkybox = {
-        SkyboxBk = sky.SkyboxBk,
-        SkyboxDn = sky.SkyboxDn,
-        SkyboxFt = sky.SkyboxFt,
-        SkyboxLf = sky.SkyboxLf,
-        SkyboxRt = sky.SkyboxRt,
-        SkyboxUp = sky.SkyboxUp
-    }
-end
-
-local function applySkybox(id)
-    local assetId = tonumber(id)
-    if not assetId then
-        skyboxStatus.Text = "Ошибка"
-        return
-    end
-    if not originalSkybox then saveOriginalSkybox() end
-    local sky = lighting:FindFirstChildWhichIsA("Sky")
-    if not sky then sky = Instance.new("Sky") sky.Parent = lighting end
-    local url = "rbxassetid://" .. assetId
-    sky.SkyboxBk = url
-    sky.SkyboxDn = url
-    sky.SkyboxFt = url
-    sky.SkyboxLf = url
-    sky.SkyboxRt = url
-    sky.SkyboxUp = url
-    skyboxStatus.Text = "Готово: " .. assetId
-    playSound()
-end
-
-local function resetSkybox()
-    if originalSkybox then
-        local sky = lighting:FindFirstChildWhichIsA("Sky")
-        if not sky then sky = Instance.new("Sky") sky.Parent = lighting end
-        sky.SkyboxBk = originalSkybox.SkyboxBk
-        sky.SkyboxDn = originalSkybox.SkyboxDn
-        sky.SkyboxFt = originalSkybox.SkyboxFt
-        sky.SkyboxLf = originalSkybox.SkyboxLf
-        sky.SkyboxRt = originalSkybox.SkyboxRt
-        sky.SkyboxUp = originalSkybox.SkyboxUp
-        skyboxStatus.Text = "Сброшено"
-        playSound()
-    end
-end
-
--- === ESP С НИКНЕЙМАМИ (БЕЗ ДИСТАНЦИИ) ===
+-- === ESP ===
 local espListData = {}
 
 local function createNametag(character, playerName)
@@ -227,7 +165,6 @@ local function createNametag(character, playerName)
     billboard.StudsOffset = Vector3.new(0, 2.5, 0)
     billboard.AlwaysOnTop = true
     billboard.Parent = character
-    
     local textLabel = Instance.new("TextLabel")
     textLabel.Size = UDim2.new(1, 0, 1, 0)
     textLabel.BackgroundTransparency = 1
@@ -238,36 +175,30 @@ local function createNametag(character, playerName)
     textLabel.TextStrokeTransparency = 0.3
     textLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
     textLabel.Parent = billboard
-    
     return billboard
 end
 
 local function addESP(target)
     if espListData[target] or target == player then return false end
-    
     local highlight = Instance.new("Highlight")
     highlight.FillColor = Color3.fromRGB(0, 0, 0)
     highlight.OutlineColor = Color3.fromRGB(0, 0, 0)
     highlight.FillTransparency = 0.5
     highlight.Parent = target.Character
-    
     local nametag = nil
     if target.Character then
         nametag = createNametag(target.Character, target.Name)
     end
-    
     local charAdded = target.CharacterAdded:Connect(function(character)
         highlight.Parent = character
         if nametag then nametag:Destroy() end
         nametag = createNametag(character, target.Name)
     end)
-    
     local charRemoving = target.CharacterRemoving:Connect(function()
         highlight.Parent = nil
         if nametag then nametag:Destroy() end
         nametag = nil
     end)
-    
     espListData[target] = {
         highlight = highlight,
         nametag = nametag,
@@ -352,7 +283,6 @@ local function updatePlayersList()
     playersListBox.CanvasSize = UDim2.new(0, 0, 0, y + 10)
 end
 
--- === ПОДСВЕТКА ===
 function setupHover(btn)
     local orig = btn.BackgroundColor3
     btn.MouseEnter:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(70, 70, 90) end)
@@ -369,7 +299,6 @@ frame.Active = true
 frame.Draggable = true
 frame.Parent = gui
 
--- ЗАГОЛОВОК
 title.Size = UDim2.new(1, 0, 0, 40)
 title.Position = UDim2.new(0, 0, 0, 0)
 title.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
@@ -380,7 +309,6 @@ title.Font = Enum.Font.GothamBold
 title.TextXAlignment = Enum.TextXAlignment.Center
 title.Parent = frame
 
--- КНОПКА ЗАКРЫТИЯ
 closeBtn.Size = UDim2.new(0, 30, 0, 30)
 closeBtn.Position = UDim2.new(1, -35, 0, 5)
 closeBtn.Text = "X"
@@ -392,7 +320,6 @@ closeBtn.Parent = frame
 closeBtn.MouseButton1Click:Connect(function() frame.Visible = false end)
 setupHover(closeBtn)
 
--- FPS СЧЁТЧИК
 fpsLabel.Size = UDim2.new(0, 140, 0, 40)
 fpsLabel.Position = UDim2.new(0.5, -70, 0, 0)
 fpsLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -417,19 +344,18 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- ВКЛАДКИ
 tabsFrame.Size = UDim2.new(1, 0, 0, 35)
 tabsFrame.Position = UDim2.new(0, 0, 0, 40)
 tabsFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
 tabsFrame.Parent = frame
 
-local tabs = {tabFOV, tabResolution, tabSkybox, tabESP, tabMisc, tabSettings}
-local tabNames = {"FOV", "RES", "SKYBOX", "ESP", "MISC", "SET"}
+local tabs = {tabFOV, tabResolution, tabESP, tabMisc, tabSettings}
+local tabNames = {"FOV", "RES", "ESP", "MISC", "SET"}
 local tabContents = {}
 
 for i, tab in ipairs(tabs) do
-    tab.Size = UDim2.new(0.166, 0, 1, 0)
-    tab.Position = UDim2.new((i-1) * 0.166, 0, 0, 0)
+    tab.Size = UDim2.new(0.2, 0, 1, 0)
+    tab.Position = UDim2.new((i-1) * 0.2, 0, 0, 0)
     tab.Text = tabNames[i]
     tab.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
     tab.TextColor3 = Color3.fromRGB(180, 180, 190)
@@ -450,16 +376,11 @@ for i, tab in ipairs(tabs) do
     setupHover(tab)
 end
 
--- КОНТЕЙНЕР
 contentContainer.Size = UDim2.new(1, -20, 1, -85)
 contentContainer.Position = UDim2.new(0, 10, 0, 80)
 contentContainer.BackgroundTransparency = 1
 contentContainer.ScrollBarThickness = 4
 contentContainer.Parent = frame
-
-contentList.SortOrder = Enum.SortOrder.LayoutOrder
-contentList.Padding = UDim.new(0, 10)
-contentList.Parent = contentContainer
 
 -- === FOV ===
 local fovContent = Instance.new("Frame")
@@ -612,64 +533,6 @@ resToggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- === SKYBOX ===
-local skyboxContent = Instance.new("Frame")
-skyboxContent.Size = UDim2.new(1, 0, 0, 140)
-skyboxContent.BackgroundTransparency = 1
-skyboxContent.Parent = contentContainer
-skyboxContent.Visible = false
-table.insert(tabContents, skyboxContent)
-
-local skyboxTitle = Instance.new("TextLabel")
-skyboxTitle.Size = UDim2.new(1, 0, 0, 30)
-skyboxTitle.BackgroundTransparency = 1
-skyboxTitle.Text = "SKYBOX CHANGER"
-skyboxTitle.TextColor3 = Color3.fromRGB(220, 220, 230)
-skyboxTitle.TextSize = 18
-skyboxTitle.Font = Enum.Font.GothamBold
-skyboxTitle.Parent = skyboxContent
-
-skyboxInput.Size = UDim2.new(1, 0, 0, 32)
-skyboxInput.Position = UDim2.new(0, 0, 0, 35)
-skyboxInput.PlaceholderText = "ID неба"
-skyboxInput.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-skyboxInput.TextColor3 = Color3.fromRGB(230, 230, 240)
-skyboxInput.TextSize = 14
-skyboxInput.Font = Enum.Font.GothamBold
-skyboxInput.Parent = skyboxContent
-
-skyboxApplyBtn.Size = UDim2.new(0.48, 0, 0, 32)
-skyboxApplyBtn.Position = UDim2.new(0, 0, 0, 75)
-skyboxApplyBtn.Text = "ПРИМЕНИТЬ"
-skyboxApplyBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-skyboxApplyBtn.TextColor3 = Color3.fromRGB(220, 220, 230)
-skyboxApplyBtn.TextSize = 13
-skyboxApplyBtn.Font = Enum.Font.GothamBold
-skyboxApplyBtn.Parent = skyboxContent
-setupHover(skyboxApplyBtn)
-
-skyboxResetBtn.Size = UDim2.new(0.48, 0, 0, 32)
-skyboxResetBtn.Position = UDim2.new(0.52, 0, 0, 75)
-skyboxResetBtn.Text = "СБРОСИТЬ"
-skyboxResetBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-skyboxResetBtn.TextColor3 = Color3.fromRGB(220, 220, 230)
-skyboxResetBtn.TextSize = 13
-skyboxResetBtn.Font = Enum.Font.GothamBold
-skyboxResetBtn.Parent = skyboxContent
-setupHover(skyboxResetBtn)
-
-skyboxStatus.Size = UDim2.new(1, 0, 0, 25)
-skyboxStatus.Position = UDim2.new(0, 0, 0, 115)
-skyboxStatus.BackgroundTransparency = 1
-skyboxStatus.Text = "ГОТОВ"
-skyboxStatus.TextColor3 = Color3.fromRGB(160, 160, 170)
-skyboxStatus.TextSize = 12
-skyboxStatus.Font = Enum.Font.GothamBold
-skyboxStatus.Parent = skyboxContent
-
-skyboxApplyBtn.MouseButton1Click:Connect(function() applySkybox(skyboxInput.Text) end)
-skyboxResetBtn.MouseButton1Click:Connect(function() resetSkybox() end)
-
 -- === ESP ===
 local espContent = Instance.new("Frame")
 espContent.Size = UDim2.new(1, 0, 0, 340)
@@ -810,7 +673,7 @@ miscTitle.Parent = miscContent
 
 teleportBtn.Size = UDim2.new(1, 0, 0, 38)
 teleportBtn.Position = UDim2.new(0, 0, 0, 35)
-teleportBtn.Text = "ТЕЛЕПОРТ (КЛИК)   |   КЛАВИША: " .. teleportKey.Name
+teleportBtn.Text = "ТЕЛЕПОРТ (КЛИК)   |   КЛАВИША: Z"
 teleportBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
 teleportBtn.TextColor3 = Color3.fromRGB(220, 220, 230)
 teleportBtn.TextSize = 14
@@ -957,11 +820,9 @@ function showNotification(msg)
     end
 end
 
--- Активация первой вкладки
 tabFOV.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
 tabFOV.TextColor3 = Color3.fromRGB(255, 255, 255)
 
--- ОБНОВЛЕНИЕ
 local function updateCanvasSize()
     local h = 0
     for _, child in ipairs(contentContainer:GetChildren()) do
@@ -974,7 +835,6 @@ end
 contentContainer:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateCanvasSize)
 updateCanvasSize()
 
--- Выход игроков (ESP)
 game.Players.PlayerRemoving:Connect(function(leaving)
     if espListData[leaving] then
         removeESP(leaving)
