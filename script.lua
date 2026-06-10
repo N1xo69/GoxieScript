@@ -1,4 +1,4 @@
--- Goxie Script Menu (ФИНАЛ: поля ввода + конфиги)
+-- Goxie Script Menu (ФИНАЛ: конфиги через getgenv, без readfile)
 -- Нажмите Right Shift для открытия меню
 
 local player = game.Players.LocalPlayer
@@ -15,7 +15,7 @@ local tabSkybox = Instance.new("TextButton")
 local tabESP = Instance.new("TextButton")
 local tabMisc = Instance.new("TextButton")
 local tabSettings = Instance.new("TextButton")
-local tabConfigs = Instance.new("TextButton")  -- новая вкладка
+local tabConfigs = Instance.new("TextButton")
 
 -- Контент
 local contentContainer = Instance.new("ScrollingFrame")
@@ -67,12 +67,10 @@ local colorB = Instance.new("TextBox")
 local colorApplyBtn = Instance.new("TextButton")
 local colorPreview = Instance.new("Frame")
 
--- --- КОНФИГИ ---
+-- --- КОНФИГИ (через getgenv) ---
 local configListBox = Instance.new("ScrollingFrame")
 local configNameInput = Instance.new("TextBox")
 local saveConfigBtn = Instance.new("TextButton")
-local loadConfigBtn = Instance.new("TextButton")
-local deleteConfigBtn = Instance.new("TextButton")
 local configStatus = Instance.new("TextLabel")
 
 local fpsLabel = Instance.new("TextLabel")
@@ -93,29 +91,9 @@ local menuWidth = 800
 local menuHeight = 500
 local menuColor = Color3.fromRGB(18, 18, 22)
 
--- === СИСТЕМА КОНФИГОВ ===
-local configs = {}
-local currentConfig = nil
-
-local function loadConfigsFromStorage()
-    local success, data = pcall(function()
-        return game:GetService("HttpService"):JSONDecode(readfile("GoxieConfigs.json"))
-    end)
-    if success and data then
-        configs = data
-    else
-        configs = {}
-    end
-end
-
-local function saveConfigsToStorage()
-    local success, err = pcall(function()
-        writefile("GoxieConfigs.json", game:GetService("HttpService"):JSONEncode(configs))
-    end)
-    if not success then
-        warn("Не удалось сохранить конфиги: " .. tostring(err))
-    end
-end
+-- === СИСТЕМА КОНФИГОВ (через getgenv, без файлов) ===
+local configs = getgenv().GoxieConfigs or {}
+getgenv().GoxieConfigs = configs
 
 local function saveCurrentConfig(name)
     local config = {
@@ -129,7 +107,7 @@ local function saveCurrentConfig(name)
         lastFOV = currentFOV
     }
     configs[name] = config
-    saveConfigsToStorage()
+    getgenv().GoxieConfigs = configs
     updateConfigListDisplay()
     showNotification("💾 Конфиг '" .. name .. "' сохранён!", false)
     playNotifySound()
@@ -137,7 +115,7 @@ end
 
 local function loadConfig(name)
     local config = configs[name]
-    if not then
+    if not config then
         showNotification("❌ Конфиг не найден", true)
         playNotifySound()
         return
@@ -161,7 +139,6 @@ local function loadConfig(name)
         currentFOV = config.lastFOV
         fovInputBox.Text = tostring(currentFOV)
         if fovActive then camera.FieldOfView = currentFOV end
-        updateSliderPosition(currentFOV)
     end
     
     updateMenuAppearance()
@@ -177,7 +154,7 @@ end
 local function deleteConfig(name)
     if configs[name] then
         configs[name] = nil
-        saveConfigsToStorage()
+        getgenv().GoxieConfigs = configs
         updateConfigListDisplay()
         showNotification("🗑️ Конфиг '" .. name .. "' удалён!", false)
         playNotifySound()
@@ -192,7 +169,7 @@ local function updateConfigListDisplay()
     local y = 0
     for name, _ in pairs(configs) do
         local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1, -10, 0, 25)
+        btn.Size = UDim2.new(1, -10, 0, 28)
         btn.Position = UDim2.new(0, 5, 0, y)
         btn.Text = name
         btn.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
@@ -204,8 +181,8 @@ local function updateConfigListDisplay()
         btn.Parent = configListBox
         
         local loadBtn = Instance.new("TextButton")
-        loadBtn.Size = UDim2.new(0.2, 0, 0, 20)
-        loadBtn.Position = UDim2.new(0.78, 0, 0, 2)
+        loadBtn.Size = UDim2.new(0.2, 0, 0, 22)
+        loadBtn.Position = UDim2.new(0.78, 0, 0, 3)
         loadBtn.Text = "ЗАГР"
         loadBtn.BackgroundColor3 = Color3.fromRGB(40, 50, 40)
         loadBtn.TextColor3 = Color3.fromRGB(150, 200, 150)
@@ -219,8 +196,8 @@ local function updateConfigListDisplay()
         setupButtonHover(loadBtn)
         
         local delBtn = Instance.new("TextButton")
-        delBtn.Size = UDim2.new(0.2, 0, 0, 20)
-        delBtn.Position = UDim2.new(0.98, -50, 0, 2)
+        delBtn.Size = UDim2.new(0.2, 0, 0, 22)
+        delBtn.Position = UDim2.new(0.98, -50, 0, 3)
         delBtn.Text = "УДАЛ"
         delBtn.BackgroundColor3 = Color3.fromRGB(50, 40, 40)
         delBtn.TextColor3 = Color3.fromRGB(200, 150, 150)
@@ -234,12 +211,10 @@ local function updateConfigListDisplay()
         setupButtonHover(delBtn)
         
         setupButtonHover(btn)
-        y = y + 30
+        y = y + 33
     end
     configListBox.CanvasSize = UDim2.new(0, 0, 0, y + 10)
 end
-
-loadConfigsFromStorage()
 
 -- === ЗВУК ===
 local function playNotifySound()
@@ -1627,7 +1602,7 @@ configListBox.Parent = configsContent
 configStatus.Size = UDim2.new(1, 0, 0, 18)
 configStatus.Position = UDim2.new(0, 0, 0, 290)
 configStatus.BackgroundTransparency = 1
-configStatus.Text = "Конфиги сохраняются автоматически"
+configStatus.Text = "Конфиги сохраняются в памяти"
 configStatus.TextColor3 = Color3.fromRGB(140, 140, 155)
 configStatus.TextSize = 9
 configStatus.Font = Enum.Font.Gotham
@@ -1693,4 +1668,4 @@ updatePlayersList()
 updateBindDisplay()
 updateTeleportBindDisplay()
 
-print("GOXIE SCRIPT loaded | Press " .. currentBind.Name .. " to open menu | Configs saved")
+print("GOXIE SCRIPT loaded | Press " .. currentBind.Name .. " to open menu | Configs via getgenv")
